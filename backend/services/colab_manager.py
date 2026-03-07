@@ -17,9 +17,9 @@ MODEL_MAP = {
 
 
 def make_slug(topic_area: str, model_id: str) -> str:
-    """Deriva slug unico: {topic}_{model_id}_{YYYYMMDD-HHMM}."""
+    """Deriva slug unico: {topic}_{model_id}_{YYYYMMDD-HHMMSS}."""
     topic_slug = re.sub(r"[^a-z0-9]+", "-", topic_area.lower()).strip("-")[:30]
-    ts         = datetime.now().strftime("%Y%m%d-%H%M")
+    ts         = datetime.now().strftime("%Y%m%d-%H%M%S")
     return f"{topic_slug}_{model_id}_{ts}"
 
 

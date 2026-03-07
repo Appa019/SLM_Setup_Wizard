@@ -24,10 +24,13 @@ class ColabStartRequest(BaseModel):
 
 @router.post("/generate-notebook")
 async def generate_colab_notebook(body: ColabStartRequest):
-    notebook_path = generate_notebook(body.model_id, body.topic_profile)
+    topic_area    = body.topic_profile.get("area", "especialista")
+    model_slug    = make_slug(topic_area, body.model_id)
+    notebook_path = generate_notebook(body.model_id, body.topic_profile, model_slug=model_slug)
     return {
         "ok": True,
         "notebook_path": str(notebook_path),
+        "model_slug":    model_slug,
         "message": f"Notebook gerado em {notebook_path.name}",
     }
 
@@ -81,13 +84,16 @@ async def start_colab(body: ColabStartRequest, background_tasks: BackgroundTasks
     model_slug  = make_slug(topic_area, body.model_id)
 
     # Gravar sidecar imediatamente (antes de background task)
-    write_sidecar(
-        slug=model_slug,
-        topic_profile=body.topic_profile,
-        model_id=body.model_id,
-        quant_type=body.quant_type,
-        training_target=training_target,
-    )
+    try:
+        write_sidecar(
+            slug=model_slug,
+            topic_profile=body.topic_profile,
+            model_id=body.model_id,
+            quant_type=body.quant_type,
+            training_target=training_target,
+        )
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Erro ao gravar metadata do especialista: {exc}") from exc
 
     # Se GPU do usuario for superior ao T4 → script local
     if training_target == "local":
