@@ -1,23 +1,37 @@
 import { useEffect, useRef, useState } from 'react'
-import { Cpu, FolderOpen, Play, Square, Send, RefreshCw, CheckCircle2, AlertCircle, Terminal } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Cpu, FolderOpen, Play, Square, Send, RefreshCw, CheckCircle2, AlertCircle, Terminal, Plus } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Layout from '../components/Layout'
 import ChatMessage from '../components/ChatMessage'
 import { useWizard } from '../context/WizardContext'
 import api from '../lib/api'
 
+interface ModelInfo {
+  name:            string
+  path:            string
+  size_gb:         number
+  topic:           string
+  base_model:      string
+  quant_type:      string
+  training_target: string
+  created_at:      string
+  subtopics:       string[]
+}
+
 interface ModelStatus {
   llama_available: boolean
-  models: Array<{ name: string; path: string; size_gb: number }>
-  server_running: boolean
-  loaded_model: string
-  server_port: number | null
+  models:          ModelInfo[]
+  server_running:  boolean
+  loaded_model:    string
+  server_port:     number | null
 }
 
 interface Msg { role: 'user' | 'assistant'; content: string }
 
 export default function Dashboard() {
-  const { setCurrentStep } = useWizard()
+  const { setCurrentStep, resetWizard } = useWizard()
+  const navigate = useNavigate()
   const [status, setStatus]     = useState<ModelStatus | null>(null)
   const [selected, setSelected] = useState('')
   const [loading, setLoading]   = useState(false)
@@ -151,35 +165,60 @@ export default function Dashboard() {
 
           {status && status.models.length > 0 && (
             <div className="space-y-1.5">
-              <p className="section-title">Modelos disponíveis</p>
-              {status.models.map(m => (
-                <label
-                  key={m.name}
-                  className={`flex items-center gap-2.5 p-2.5 rounded border cursor-pointer transition-colors
-                    ${selected === m.name
-                      ? 'border-accent-500 bg-accent-50'
-                      : 'border-surface-200 hover:border-surface-300'}`}
-                >
-                  <input
-                    type="radio" name="model" value={m.name}
-                    checked={selected === m.name}
-                    onChange={() => setSelected(m.name)}
-                    className="accent-accent-500"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{m.name}</p>
-                    <p className="text-[11px] text-gray-400">{m.size_gb} GB</p>
-                  </div>
-                  {status.loaded_model === m.name && running && (
-                    <CheckCircle2 size={14} className="text-success-600 flex-shrink-0" />
-                  )}
-                </label>
-              ))}
+              <p className="section-title">Especialistas treinados</p>
+              {status.models.map(m => {
+                const isLoaded   = status.loaded_model === m.name && running
+                const isSelected = selected === m.name
+                const dateStr    = m.created_at
+                  ? new Date(m.created_at).toLocaleDateString('pt-BR')
+                  : ''
+                const targetBadge = m.training_target === 'local' ? 'badge-blue' : 'badge-gray'
+                return (
+                  <label
+                    key={m.name}
+                    className={`flex items-start gap-2.5 p-3 rounded border cursor-pointer transition-colors
+                      ${isSelected
+                        ? 'border-accent-500 bg-accent-50'
+                        : 'border-surface-200 hover:border-surface-300'}`}
+                  >
+                    <input
+                      type="radio" name="model" value={m.name}
+                      checked={isSelected}
+                      onChange={() => setSelected(m.name)}
+                      className="accent-accent-500 mt-1 flex-shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-semibold text-gray-900 truncate">
+                          {m.topic || m.name}
+                        </p>
+                        {isLoaded && <CheckCircle2 size={13} className="text-success-600 flex-shrink-0" />}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        {m.base_model && <span className="code">{m.base_model}</span>}
+                        {m.quant_type && <span className="code">{m.quant_type.toUpperCase()}</span>}
+                        <span className="text-[11px] text-gray-400">{m.size_gb} GB</span>
+                        {m.training_target && (
+                          <span className={`${targetBadge} text-[10px]`}>
+                            {m.training_target === 'local' ? 'GPU local' : 'Colab T4'}
+                          </span>
+                        )}
+                        {dateStr && <span className="text-[11px] text-gray-400">{dateStr}</span>}
+                      </div>
+                      {m.subtopics && m.subtopics.length > 0 && (
+                        <p className="text-[10px] text-gray-400 mt-0.5 truncate">
+                          {m.subtopics.slice(0, 4).join(' · ')}
+                        </p>
+                      )}
+                    </div>
+                  </label>
+                )
+              })}
             </div>
           )}
 
           {/* Action buttons */}
-          <div className="flex gap-2 border-t border-surface-200 pt-3">
+          <div className="flex gap-2 border-t border-surface-200 pt-3 flex-wrap">
             <button
               onClick={handleLoad}
               disabled={!selected || loading || running}
@@ -194,6 +233,13 @@ export default function Dashboard() {
                 {stopping ? 'Parando...' : 'Parar'}
               </button>
             )}
+            <button
+              onClick={() => { resetWizard(); navigate('/settings') }}
+              className="btn-secondary ml-auto"
+            >
+              <Plus size={13} />
+              Treinar Novo Especialista
+            </button>
           </div>
         </div>
 
