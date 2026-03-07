@@ -59,7 +59,7 @@ async def _process_chunk(client: AsyncOpenAI, chunk: str, topic: str) -> list[di
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": f"Topico: {topic}\n\nTexto:\n{chunk}"},
             ],
-            max_tokens=800,
+            max_tokens=1100,
             temperature=0.7,
         )
         usage = response.usage
