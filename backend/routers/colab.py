@@ -4,7 +4,7 @@ from pathlib import Path
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from services.colab_manager import generate_notebook, generate_local_script
+from services.colab_manager import generate_notebook, generate_local_script, make_slug, write_sidecar
 from services.colab_playwright import run_colab_automation, get_training_state
 from services.hyperparams import generate_hyperparams, T4_VRAM_GB
 
@@ -76,24 +76,39 @@ async def start_colab(body: ColabStartRequest, background_tasks: BackgroundTasks
 
     training_target = params["training_target"]
 
+    # Derivar slug unico para este especialista
+    topic_area  = body.topic_profile.get("area", "especialista")
+    model_slug  = make_slug(topic_area, body.model_id)
+
+    # Gravar sidecar imediatamente (antes de background task)
+    write_sidecar(
+        slug=model_slug,
+        topic_profile=body.topic_profile,
+        model_id=body.model_id,
+        quant_type=body.quant_type,
+        training_target=training_target,
+    )
+
     # Se GPU do usuario for superior ao T4 → script local
     if training_target == "local":
-        script_path = generate_local_script(body.model_id, body.topic_profile, params)
+        script_path = generate_local_script(body.model_id, body.topic_profile, params, model_slug)
         return {
             "ok":          True,
             "target":      "local",
             "script_path": str(script_path),
+            "model_slug":  model_slug,
             "params":      params,
         }
 
     # Caso contrario → notebook Colab + automacao Playwright
-    notebook_path = generate_notebook(body.model_id, body.topic_profile, params)
+    notebook_path = generate_notebook(body.model_id, body.topic_profile, params, model_slug)
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     background_tasks.add_task(run_colab_automation, notebook_path, dataset_path, MODELS_DIR)
     return {
         "ok":            True,
         "target":        "colab",
         "notebook_path": str(notebook_path),
+        "model_slug":    model_slug,
         "params":        params,
     }
 

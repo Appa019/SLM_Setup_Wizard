@@ -1,7 +1,10 @@
 import json
+import re
+from datetime import datetime
 from pathlib import Path
 
-COLAB_DIR = Path(__file__).parent.parent.parent / "colab"
+COLAB_DIR      = Path(__file__).parent.parent.parent / "colab"
+MODELS_DIR     = Path(__file__).parent.parent.parent / "models"
 DATA_PROCESSED = Path(__file__).parent.parent.parent / "data" / "processed"
 
 MODEL_MAP = {
@@ -13,12 +16,40 @@ MODEL_MAP = {
 }
 
 
-def generate_notebook(model_id: str, topic_profile: dict, params: dict | None = None) -> Path:
+def make_slug(topic_area: str, model_id: str) -> str:
+    """Deriva slug unico: {topic}_{model_id}_{YYYYMMDD-HHMM}."""
+    topic_slug = re.sub(r"[^a-z0-9]+", "-", topic_area.lower()).strip("-")[:30]
+    ts         = datetime.now().strftime("%Y%m%d-%H%M")
+    return f"{topic_slug}_{model_id}_{ts}"
+
+
+def write_sidecar(slug: str, topic_profile: dict, model_id: str,
+                  quant_type: str, training_target: str) -> None:
+    """Grava models/{slug}.json com metadata do especialista."""
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    meta = {
+        "slug":            slug,
+        "topic":           topic_profile.get("area", "Conhecimento Geral"),
+        "subtopics":       topic_profile.get("subtopics", []),
+        "base_model":      model_id,
+        "quant_type":      quant_type,
+        "training_target": training_target,
+        "created_at":      datetime.now().isoformat(timespec="seconds"),
+    }
+    (MODELS_DIR / f"{slug}.json").write_text(
+        json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
+def generate_notebook(model_id: str, topic_profile: dict,
+                      params: dict | None = None,
+                      model_slug: str = "especialista") -> Path:
     """Gera notebook Colab com celula de configuracao dinamica da IA."""
     COLAB_DIR.mkdir(parents=True, exist_ok=True)
     hf_model   = MODEL_MAP.get(model_id, "meta-llama/Llama-3.2-3B-Instruct")
     topic_area = topic_profile.get("area", "conhecimento geral")
     p          = params or {}
+    gguf_name  = f"{model_slug}.gguf"
 
     config_cell = _code_cell(
         "# ╔══════════════════════════════════════════╗\n"
@@ -203,11 +234,11 @@ def generate_notebook(model_id: str, topic_profile: dict, params: dict | None = 
         _code_cell(
             "!git clone https://github.com/ggerganov/llama.cpp /content/llama.cpp\n"
             "!pip install -q gguf\n"
-            "!python /content/llama.cpp/convert_hf_to_gguf.py ./merged_model "
-            "--outfile ./modelo_final.gguf --outtype {GGUF_QUANT_TYPE}\n"
+            f"!python /content/llama.cpp/convert_hf_to_gguf.py ./merged_model "
+            f"--outfile ./{gguf_name} --outtype {{GGUF_QUANT_TYPE}}\n"
             'print("Conversao para GGUF concluida!")\n'
             "import os\n"
-            "size = os.path.getsize('./modelo_final.gguf') / (1024**3)\n"
+            f"size = os.path.getsize('./{gguf_name}') / (1024**3)\n"
             'print(f"Tamanho: {size:.2f} GB")'
         ),
 
@@ -215,7 +246,7 @@ def generate_notebook(model_id: str, topic_profile: dict, params: dict | None = 
         _code_cell(
             "from google.colab import files\n"
             'print("Iniciando download do modelo GGUF...")\n'
-            "files.download('./modelo_final.gguf')\n"
+            f"files.download('./{gguf_name}')\n"
             'print("Download iniciado!")'
         ),
     ]
@@ -232,17 +263,20 @@ def generate_notebook(model_id: str, topic_profile: dict, params: dict | None = 
         "cells": cells,
     }
 
-    output_path = COLAB_DIR / "generated_notebook.ipynb"
+    output_path = COLAB_DIR / f"{model_slug}.ipynb"
     output_path.write_text(json.dumps(notebook, ensure_ascii=False, indent=2))
     return output_path
 
 
-def generate_local_script(model_id: str, topic_profile: dict, params: dict | None = None) -> Path:
+def generate_local_script(model_id: str, topic_profile: dict,
+                           params: dict | None = None,
+                           model_slug: str = "especialista") -> Path:
     """Gera script Python puro para treinamento local (GPU usuario > T4)."""
     COLAB_DIR.mkdir(parents=True, exist_ok=True)
     hf_model   = MODEL_MAP.get(model_id, "meta-llama/Llama-3.2-3B-Instruct")
     topic_area = topic_profile.get("area", "conhecimento geral")
     p          = params or {}
+    gguf_name = f"{model_slug}.gguf"
 
     script = (
         "#!/usr/bin/env python3\n"
@@ -348,10 +382,10 @@ def generate_local_script(model_id: str, topic_profile: dict, params: dict | Non
         "tokenizer.save_pretrained('./lora_adapter')\n"
         "print('Adapter salvo em ./lora_adapter')\n"
         "print(f'Para converter para GGUF execute:')\n"
-        "print(f'python llama.cpp/convert_hf_to_gguf.py ./lora_adapter --outfile modelo_final.gguf --outtype {GGUF_QUANT_TYPE}')\n"
+        f"print(f'python llama.cpp/convert_hf_to_gguf.py ./lora_adapter --outfile {gguf_name} --outtype {{GGUF_QUANT_TYPE}}')\n"
     )
 
-    output_path = COLAB_DIR / "local_training.py"
+    output_path = COLAB_DIR / f"{model_slug}_local.py"
     output_path.write_text(script, encoding="utf-8")
 
     # Gerar requirements.txt
