@@ -1,61 +1,45 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CheckCircle, ChevronRight, AlertCircle } from 'lucide-react'
+import { CheckCircle2, AlertCircle, ArrowRight, Sparkles } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Layout from '../components/Layout'
 import { useWizard } from '../context/WizardContext'
 import api from '../lib/api'
 
-interface PreprocessState {
-  running: boolean
-  total_chunks: number
-  done: number
-  failed: number
-  pairs_generated: number
-  finished: boolean
-  error: string
+interface PPState {
+  running: boolean; total_chunks: number; done: number; failed: number
+  pairs_generated: number; finished: boolean; error: string
   examples: Array<{ instruction: string; input: string; output: string }>
 }
 
 export default function Preprocessing() {
   const { state, setCurrentStep } = useWizard()
   const navigate = useNavigate()
-  const [ppState, setPpState] = useState<PreprocessState | null>(null)
+  const [ppState, setPPState] = useState<PPState | null>(null)
   const [started, setStarted] = useState(false)
   const [starting, setStarting] = useState(false)
   const esRef = useRef<EventSource | null>(null)
 
   useEffect(() => { setCurrentStep(7) }, [setCurrentStep])
+  useEffect(() => () => esRef.current?.close(), [])
 
-  useEffect(() => {
-    return () => { esRef.current?.close() }
-  }, [])
-
-  async function handleStart() {
+  async function start() {
     setStarting(true)
     try {
-      await api.post('/api/preprocessing/start', {
-        topic_profile: state.topicProfile ?? {},
-      })
+      await api.post('/api/preprocessing/start', { topic_profile: state.topicProfile ?? {} })
       setStarted(true)
-      startSSE()
+      const es = new EventSource('http://localhost:8000/api/preprocessing/status')
+      esRef.current = es
+      es.onmessage = e => {
+        const d: PPState = JSON.parse(e.data)
+        setPPState(d)
+        if (d.finished || d.error) es.close()
+      }
+      es.onerror = () => es.close()
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } } }
-      alert(e.response?.data?.detail ?? 'Erro ao iniciar pre-processamento')
-    } finally {
-      setStarting(false)
-    }
-  }
-
-  function startSSE() {
-    const es = new EventSource('http://localhost:8000/api/preprocessing/status')
-    esRef.current = es
-    es.onmessage = (event) => {
-      const data: PreprocessState = JSON.parse(event.data)
-      setPpState(data)
-      if (data.finished || data.error) es.close()
-    }
-    es.onerror = () => es.close()
+      alert(e.response?.data?.detail ?? 'Erro ao iniciar')
+    } finally { setStarting(false) }
   }
 
   const pct = ppState && ppState.total_chunks > 0
@@ -63,34 +47,32 @@ export default function Preprocessing() {
     : 0
 
   return (
-    <Layout title="Pre-processamento" subtitle="Transformando dados brutos em pares de treinamento">
-      <div className="max-w-2xl space-y-6">
+    <Layout title="Pre-processamento" subtitle="Transformando textos em pares de treinamento">
+      <div className="max-w-xl space-y-4">
 
-        {/* Start card */}
+        {/* Not started */}
         {!started && (
           <div className="card space-y-4">
-            <div>
-              <h3 className="font-semibold text-gray-900">Como funciona</h3>
-              <p className="text-sm text-gray-500 mt-1">
-                Os textos coletados serao enviados em lotes para o GPT-4o mini, que ira
-                transforma-los em pares <span className="font-mono text-xs bg-surface-100 px-1 rounded">instruction / output</span> no
-                formato JSONL — o formato padrao para fine-tuning.
-              </p>
-            </div>
-            <div className="bg-surface-50 rounded-lg border border-surface-200 p-4 text-sm text-gray-600 space-y-1">
+            <h3 className="text-sm font-semibold text-gray-900 border-b border-surface-200 pb-2">
+              Como funciona
+            </h3>
+            <div className="space-y-2">
               {[
                 'Le os textos coletados no scraping',
                 'Divide em trechos de ~3.000 caracteres',
-                'Envia para GPT-4o mini gerar pares instruction/output',
+                'Envia para GPT-4o mini gerar pares instruction / output',
                 'Salva em data/processed/training_data.jsonl',
               ].map((s, i) => (
-                <div key={i} className="flex gap-2 items-start">
-                  <span className="text-accent-500 font-bold mt-0.5">{i + 1}.</span> {s}
+                <div key={i} className="flex gap-2 text-xs text-gray-600">
+                  <span className="w-4 h-4 rounded-sm bg-accent-500 text-white flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                    {i + 1}
+                  </span>
+                  {s}
                 </div>
               ))}
             </div>
-            <div className="flex justify-end">
-              <button onClick={handleStart} disabled={starting} className="btn-primary px-8">
+            <div className="flex justify-end border-t border-surface-200 pt-3">
+              <button onClick={start} disabled={starting} className="btn-primary">
                 {starting ? 'Iniciando...' : 'Iniciar Pre-processamento'}
               </button>
             </div>
@@ -100,52 +82,44 @@ export default function Preprocessing() {
         {/* Progress */}
         {ppState && (
           <>
-            <div className="card space-y-4">
-              <div className="flex justify-between text-sm">
-                <span className="font-medium text-gray-700">Progresso</span>
-                <span className="text-gray-500">{ppState.done} / {ppState.total_chunks} trechos</span>
+            <div className="card space-y-3">
+              <div className="flex justify-between text-xs text-gray-500">
+                <span className="font-medium text-gray-700">Trechos processados</span>
+                <span>{ppState.done} / {ppState.total_chunks}</span>
               </div>
-              <div className="relative h-3 bg-surface-200 rounded-full overflow-hidden">
-                <motion.div
-                  className="absolute inset-y-0 left-0 bg-accent-500 rounded-full"
-                  animate={{ width: `${pct}%` }}
-                  transition={{ duration: 0.4 }}
-                />
+              <div className="h-2 bg-surface-200 rounded-sm overflow-hidden">
+                <motion.div className="h-full bg-accent-500" animate={{ width: `${pct}%` }} transition={{ duration: 0.4 }} />
               </div>
-              <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="grid grid-cols-3 gap-2">
                 {[
-                  { label: 'Processados', value: ppState.done, color: 'text-green-600' },
-                  { label: 'Falhas', value: ppState.failed, color: 'text-red-500' },
+                  { label: 'Processados',   value: ppState.done,            color: 'text-success-600' },
+                  { label: 'Falhas',        value: ppState.failed,          color: 'text-danger-600' },
                   { label: 'Pares gerados', value: ppState.pairs_generated, color: 'text-accent-500' },
                 ].map(s => (
-                  <div key={s.label} className="bg-surface-50 rounded-lg p-3 border border-surface-200">
-                    <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
+                  <div key={s.label} className="bg-surface-50 border border-surface-200 rounded p-2 text-center">
+                    <p className={`text-lg font-bold font-mono ${s.color}`}>{s.value}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{s.label}</p>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Examples preview */}
+            {/* Preview */}
             <AnimatePresence>
               {ppState.examples.length > 0 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="card space-y-3"
-                >
-                  <p className="text-sm font-medium text-gray-700">
-                    Preview — ultimos pares gerados
-                  </p>
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="card space-y-2">
+                  <div className="flex items-center gap-1.5 section-title mb-1">
+                    <Sparkles size={11} /> Preview — ultimos pares
+                  </div>
                   {ppState.examples.slice(-2).map((ex, i) => (
-                    <div key={i} className="bg-surface-50 rounded-lg border border-surface-200 p-3 space-y-2 text-xs">
+                    <div key={i} className="bg-surface-50 border border-surface-200 rounded p-2.5 space-y-1.5 text-xs">
                       <div>
-                        <span className="font-medium text-accent-500">Instrucao:</span>
-                        <p className="text-gray-700 mt-0.5">{ex.instruction}</p>
+                        <span className="font-semibold text-accent-500">Instrucao: </span>
+                        <span className="text-gray-700">{ex.instruction}</span>
                       </div>
                       <div>
-                        <span className="font-medium text-gray-600">Resposta:</span>
-                        <p className="text-gray-600 mt-0.5 line-clamp-3">{ex.output}</p>
+                        <span className="font-semibold text-gray-500">Resposta: </span>
+                        <span className="text-gray-500 line-clamp-2">{ex.output}</span>
                       </div>
                     </div>
                   ))}
@@ -153,37 +127,29 @@ export default function Preprocessing() {
               )}
             </AnimatePresence>
 
-            {/* Finished */}
-            {ppState.finished && (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl p-5"
-              >
-                <div className="flex items-center gap-3">
-                  <CheckCircle size={22} className="text-green-600" />
+            {/* Done */}
+            {ppState.finished && !ppState.error && (
+              <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                className="flex items-center justify-between bg-success-50 border border-green-200 rounded p-4">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={18} className="text-success-600" />
                   <div>
-                    <p className="font-semibold text-green-800">Pre-processamento concluido!</p>
-                    <p className="text-sm text-green-600">
-                      {ppState.pairs_generated} pares salvos em training_data.jsonl
-                    </p>
+                    <p className="font-semibold text-success-700 text-sm">Pre-processamento concluido</p>
+                    <p className="text-xs text-success-600">{ppState.pairs_generated} pares em training_data.jsonl</p>
                   </div>
                 </div>
                 <button onClick={() => navigate('/colab')} className="btn-primary">
-                  Proximo: Colab <ChevronRight size={16} />
+                  Colab <ArrowRight size={14} />
                 </button>
               </motion.div>
             )}
-
             {ppState.error && (
-              <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">
-                <AlertCircle size={18} />
-                {ppState.error}
+              <div className="flex items-center gap-2 bg-danger-50 border border-red-200 rounded p-3 text-danger-600 text-xs">
+                <AlertCircle size={15} /> {ppState.error}
               </div>
             )}
           </>
         )}
-
       </div>
     </Layout>
   )

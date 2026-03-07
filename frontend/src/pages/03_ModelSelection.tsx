@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronRight, ChevronDown, ChevronUp, Check } from 'lucide-react'
+import { ChevronDown, ChevronUp, Check, ArrowRight } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Layout from '../components/Layout'
 import Loader from '../components/Loader'
@@ -19,92 +19,84 @@ interface ModelRec {
   best_for?: string
 }
 
-const COMPAT_LABEL: Record<string, { label: string; cls: string }> = {
-  high:   { label: 'Compativel',         cls: 'badge-green' },
-  medium: { label: 'Parcialmente',       cls: 'badge-yellow' },
-  low:    { label: 'Requer mais recursos', cls: 'badge-red' },
+const COMPAT: Record<string, { label: string; cls: string }> = {
+  high:   { label: 'Compativel',   cls: 'badge-green'  },
+  medium: { label: 'Parcialmente', cls: 'badge-yellow' },
+  low:    { label: 'Insuficiente', cls: 'badge-red'    },
 }
 
 export default function ModelSelection() {
   const { state, update, setCurrentStep } = useWizard()
-  const navigate = useNavigate()
-  const [models, setModels] = useState<ModelRec[]>([])
+  const navigate  = useNavigate()
+  const [models, setModels]     = useState<ModelRec[]>([])
   const [selected, setSelected] = useState('')
   const [expanded, setExpanded] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [loading, setLoading]   = useState(true)
+  const [error, setError]       = useState('')
 
   useEffect(() => {
     setCurrentStep(3)
     const hw = state.hardware
     api.post<{ recommendations: ModelRec[] }>('/api/models/recommendations', {
-      ram_gb: hw?.ram_gb ?? 8,
+      ram_gb:  hw?.ram_gb  ?? 8,
       vram_gb: hw?.vram_gb ?? null,
-      gpu: hw?.gpu ?? null,
+      gpu:     hw?.gpu     ?? null,
     })
       .then(res => { setModels(res.data.recommendations); setLoading(false) })
       .catch(() => { setError('Erro ao obter recomendacoes'); setLoading(false) })
   }, [setCurrentStep, state.hardware])
 
-  function handleSelect(id: string) {
-    setSelected(id)
-    update({ selectedModel: id })
-  }
-
-  function toggleExpand(id: string) {
-    setExpanded(prev => prev === id ? null : id)
-  }
+  function select(id: string) { setSelected(id); update({ selectedModel: id }) }
 
   return (
     <Layout title="Selecionar Modelo" subtitle="Modelos recomendados para o seu hardware">
-      <div className="max-w-2xl space-y-4">
-
-        {loading && <Loader message="Gerando recomendacoes personalizadas..." />}
-        {error && <div className="card border-red-200 bg-red-50 text-red-700 text-sm">{error}</div>}
+      <div className="max-w-xl space-y-3">
+        {loading && <Loader message="Consultando recomendacoes..." />}
+        {error && <div className="card border-red-200 bg-danger-50 text-danger-600 text-xs p-3">{error}</div>}
 
         {models.map((m, i) => {
-          const compat = COMPAT_LABEL[m.compatibility] ?? COMPAT_LABEL.medium
+          const compat     = COMPAT[m.compatibility] ?? COMPAT.medium
           const isSelected = selected === m.id
           const isExpanded = expanded === m.id
 
           return (
             <motion.div
               key={m.id}
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.07 }}
-              onClick={() => handleSelect(m.id)}
-              className={`card cursor-pointer transition-all duration-150 border-2
-                ${isSelected ? 'border-accent-500 shadow-md' : 'border-surface-200 hover:border-accent-400'}`}
+              transition={{ delay: i * 0.06 }}
+              onClick={() => select(m.id)}
+              className={`card cursor-pointer transition-colors duration-100 border-2
+                ${isSelected
+                  ? 'border-accent-500 bg-accent-50'
+                  : 'border-surface-200 hover:border-surface-300'}`}
             >
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-3 flex-1 min-w-0">
-                  {/* Checkbox */}
-                  <div className={`mt-0.5 flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors
-                    ${isSelected ? 'bg-accent-500 border-accent-500' : 'border-gray-300'}`}>
-                    {isSelected && <Check size={12} color="white" strokeWidth={3} />}
-                  </div>
+              <div className="flex items-start gap-3">
+                {/* Checkbox */}
+                <div className={`mt-0.5 w-4 h-4 rounded-sm border-2 flex items-center justify-center flex-shrink-0 transition-colors
+                  ${isSelected ? 'bg-accent-500 border-accent-500' : 'border-gray-300'}`}>
+                  {isSelected && <Check size={10} color="white" strokeWidth={3} />}
+                </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-gray-900">{m.name}</span>
-                      <span className="text-xs text-gray-500 bg-surface-100 px-2 py-0.5 rounded-full">
-                        {m.params} · {m.size_gb}GB
-                      </span>
-                      <span className={compat.cls}>{compat.label}</span>
-                    </div>
-                    <p className="text-sm text-gray-600 mt-1">{m.description}</p>
-                    {m.best_for && (
-                      <p className="text-xs text-accent-500 mt-1 font-medium">Ideal para: {m.best_for}</p>
-                    )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-gray-900 text-sm">{m.name}</span>
+                    <span className="code">{m.params} · {m.size_gb}GB</span>
+                    <span className={compat.cls}>{compat.label}</span>
                   </div>
+                  <p className="text-xs text-gray-500 mt-1 leading-relaxed">{m.description}</p>
+                  {m.best_for && (
+                    <p className="text-[11px] text-accent-500 mt-1 font-medium">
+                      Ideal para: {m.best_for}
+                    </p>
+                  )}
                 </div>
 
                 <button
-                  onClick={e => { e.stopPropagation(); toggleExpand(m.id) }}
-                  className="text-gray-400 hover:text-gray-600 flex-shrink-0 mt-0.5"
+                  onClick={e => { e.stopPropagation(); setExpanded(prev => prev === m.id ? null : m.id) }}
+                  className="text-gray-400 hover:text-gray-600 flex-shrink-0"
                 >
-                  {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                  {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                 </button>
               </div>
 
@@ -114,32 +106,27 @@ export default function ModelSelection() {
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.2 }}
                     className="overflow-hidden"
                   >
-                    <div className="mt-4 pt-4 border-t border-surface-200 grid grid-cols-2 gap-4 text-sm">
+                    <div className="mt-3 pt-3 border-t border-surface-200 grid grid-cols-2 gap-3 text-xs">
                       {m.pros && m.pros.length > 0 && (
                         <div>
-                          <p className="font-medium text-green-700 mb-1">Pontos positivos</p>
-                          <ul className="space-y-0.5">
-                            {m.pros.map((p, j) => (
-                              <li key={j} className="text-gray-600 flex gap-1.5">
-                                <span className="text-green-500 mt-0.5">+</span> {p}
-                              </li>
-                            ))}
-                          </ul>
+                          <p className="font-semibold text-success-600 mb-1">Pontos positivos</p>
+                          {m.pros.map((p, j) => (
+                            <p key={j} className="text-gray-600 flex gap-1 mb-0.5">
+                              <span className="text-success-600">+</span>{p}
+                            </p>
+                          ))}
                         </div>
                       )}
                       {m.cons && m.cons.length > 0 && (
                         <div>
-                          <p className="font-medium text-red-700 mb-1">Limitacoes</p>
-                          <ul className="space-y-0.5">
-                            {m.cons.map((c, j) => (
-                              <li key={j} className="text-gray-600 flex gap-1.5">
-                                <span className="text-red-400 mt-0.5">−</span> {c}
-                              </li>
-                            ))}
-                          </ul>
+                          <p className="font-semibold text-danger-600 mb-1">Limitacoes</p>
+                          {m.cons.map((c, j) => (
+                            <p key={j} className="text-gray-600 flex gap-1 mb-0.5">
+                              <span className="text-danger-600">−</span>{c}
+                            </p>
+                          ))}
                         </div>
                       )}
                     </div>
@@ -151,13 +138,9 @@ export default function ModelSelection() {
         })}
 
         {models.length > 0 && (
-          <div className="flex justify-end pt-2">
-            <button
-              onClick={() => navigate('/topic')}
-              disabled={!selected}
-              className="btn-primary px-8"
-            >
-              Proximo: Definir Tema <ChevronRight size={16} />
+          <div className="flex justify-end pt-1">
+            <button onClick={() => navigate('/topic')} disabled={!selected} className="btn-primary">
+              Definir Tema <ArrowRight size={14} />
             </button>
           </div>
         )}

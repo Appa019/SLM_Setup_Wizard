@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Cpu, MemoryStick, HardDrive, Monitor, ChevronRight } from 'lucide-react'
+import { Cpu, MemoryStick, HardDrive, Monitor, ArrowRight, RefreshCw } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Layout from '../components/Layout'
 import Loader from '../components/Loader'
@@ -16,21 +16,29 @@ interface HardwareData {
   capacity: { max_params: string; tier: string; label: string }
 }
 
-const TIER_COLOR: Record<string, string> = {
-  high: 'badge-green',
-  mid: 'badge-yellow',
-  low: 'badge-yellow',
+const TIER_BADGE: Record<string, string> = {
+  high:    'badge-green',
+  mid:     'badge-yellow',
+  low:     'badge-yellow',
   minimal: 'badge-red',
 }
+
+const HW_ITEMS = (d: HardwareData) => [
+  { icon: Cpu,         label: 'Processador', value: d.cpu.model || 'Desconhecido',  sub: `${d.cpu.cores} cores · ${d.cpu.freq_ghz} GHz` },
+  { icon: MemoryStick, label: 'Memoria RAM', value: `${d.ram.total_gb} GB`,         sub: `${d.ram.available_gb} GB disponivel` },
+  { icon: Monitor,     label: 'GPU',         value: d.gpu?.model ?? 'Nao detectada', sub: d.gpu ? `${d.gpu.vram_gb} GB VRAM` : 'Inferencia via CPU' },
+  { icon: HardDrive,   label: 'Disco',       value: `${d.disk.free_gb} GB livres`,  sub: d.os },
+]
 
 export default function HardwareScan() {
   const { update, setCurrentStep } = useWizard()
   const navigate = useNavigate()
-  const [data, setData] = useState<HardwareData | null>(null)
-  const [error, setError] = useState('')
+  const [data, setData]     = useState<HardwareData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError]   = useState('')
 
-  useEffect(() => {
-    setCurrentStep(2)
+  const fetchHardware = () => {
+    setLoading(true); setError('')
     api.get<HardwareData>('/api/hardware/scan')
       .then(res => {
         setData(res.data)
@@ -45,92 +53,78 @@ export default function HardwareScan() {
           }
         })
       })
-      .catch(() => setError('Erro ao escanear hardware'))
-  }, [setCurrentStep, update])
+      .catch(() => setError('Nao foi possivel escanear o hardware.'))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { setCurrentStep(2); fetchHardware() }, [setCurrentStep])
 
   return (
-    <Layout title="Scan de Hardware" subtitle="Detectando os componentes do seu sistema">
-      <div className="max-w-2xl space-y-6">
-
-        {!data && !error && <Loader message="Escaneando hardware..." />}
+    <Layout
+      title="Scan de Hardware"
+      subtitle="Detectando os componentes do sistema"
+      actions={
+        data && (
+          <button onClick={fetchHardware} className="btn-ghost text-xs">
+            <RefreshCw size={13} /> Reatualizar
+          </button>
+        )
+      }
+    >
+      <div className="max-w-xl space-y-4">
+        {loading && <Loader message="Escaneando hardware..." />}
 
         {error && (
-          <div className="card border-red-200 bg-red-50 text-red-700 text-sm">{error}</div>
+          <div className="card border-red-200 bg-danger-50 text-danger-600 text-xs p-3">
+            {error}
+          </div>
         )}
 
         {data && (
           <>
-            {/* Capacity badge */}
+            {/* Capacity summary */}
             <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
               className="card flex items-center justify-between"
             >
               <div>
-                <p className="text-sm text-gray-500">Capacidade detectada</p>
-                <p className="text-lg font-semibold text-gray-900 mt-0.5">
-                  Modelos de ate <span className="text-accent-500">{data.capacity.max_params}</span> parametros
+                <p className="section-title mb-0.5">Capacidade detectada</p>
+                <p className="text-base font-semibold text-gray-900">
+                  Modelos ate <span className="text-accent-500">{data.capacity.max_params}</span> parametros
                 </p>
               </div>
-              <span className={TIER_COLOR[data.capacity.tier] ?? 'badge-yellow'}>
+              <span className={TIER_BADGE[data.capacity.tier] ?? 'badge-yellow'}>
                 {data.capacity.label}
               </span>
             </motion.div>
 
-            {/* Hardware cards */}
-            <div className="grid grid-cols-2 gap-4">
-              {[
-                {
-                  icon: <Cpu size={18} className="text-accent-500" />,
-                  label: 'Processador',
-                  value: data.cpu.model || 'Desconhecido',
-                  detail: `${data.cpu.cores} cores · ${data.cpu.freq_ghz} GHz`,
-                },
-                {
-                  icon: <MemoryStick size={18} className="text-accent-500" />,
-                  label: 'Memoria RAM',
-                  value: `${data.ram.total_gb} GB`,
-                  detail: `${data.ram.available_gb} GB disponivel`,
-                },
-                {
-                  icon: <Monitor size={18} className="text-accent-500" />,
-                  label: 'GPU',
-                  value: data.gpu?.model ?? 'Nao detectada',
-                  detail: data.gpu ? `${data.gpu.vram_gb} GB VRAM` : 'Sera usado CPU para inferencia',
-                },
-                {
-                  icon: <HardDrive size={18} className="text-accent-500" />,
-                  label: 'Disco',
-                  value: `${data.disk.free_gb} GB livres`,
-                  detail: data.os,
-                },
-              ].map((item, i) => (
+            {/* Hardware grid */}
+            <div className="grid grid-cols-2 gap-3">
+              {HW_ITEMS(data).map((item, i) => (
                 <motion.div
                   key={i}
-                  initial={{ opacity: 0, y: 12 }}
+                  initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.08 }}
-                  className="card space-y-2"
+                  transition={{ delay: i * 0.06 }}
+                  className="card-sm space-y-2"
                 >
-                  <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
-                    {item.icon}
+                  <div className="flex items-center gap-1.5 text-gray-500 text-xs font-medium">
+                    <item.icon size={13} className="text-accent-500" />
                     {item.label}
                   </div>
                   <p className="text-sm font-semibold text-gray-900 truncate">{item.value}</p>
-                  <p className="text-xs text-gray-500">{item.detail}</p>
+                  <p className="text-[11px] text-gray-400 leading-tight">{item.sub}</p>
                 </motion.div>
               ))}
             </div>
 
-            {/* Next */}
             <div className="flex justify-end">
-              <button onClick={() => navigate('/model')} className="btn-primary px-8">
-                Proximo: Selecionar Modelo <ChevronRight size={16} />
+              <button onClick={() => navigate('/model')} className="btn-primary">
+                Selecionar Modelo <ArrowRight size={14} />
               </button>
             </div>
           </>
         )}
-
       </div>
     </Layout>
   )

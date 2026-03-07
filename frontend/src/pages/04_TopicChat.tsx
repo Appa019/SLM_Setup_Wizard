@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Send, ChevronRight, CheckCircle } from 'lucide-react'
+import { Send, ArrowRight, CheckCircle2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Layout from '../components/Layout'
 import ChatMessage from '../components/ChatMessage'
@@ -12,71 +12,63 @@ interface Msg { role: 'user' | 'assistant'; content: string }
 const WELCOME: Msg = {
   role: 'assistant',
   content:
-    'Ola! Vou te ajudar a definir o tema do seu modelo especializado.\n\n' +
-    'Para comecar: qual e a area de conhecimento que voce quer que o modelo domine? ' +
-    'Pode ser algo especifico como "direito trabalhista brasileiro", "culinaria vegana" ou "programacao em Rust".',
+    'Ola! Vou ajudar a definir o tema do seu modelo especializado.\n\n' +
+    'Qual area de conhecimento voce quer que ele domine? Seja especifico — ' +
+    '"direito trabalhista brasileiro", "suporte tecnico Linux" ou "receitas veganas" sao bons exemplos.',
 }
 
 export default function TopicChat() {
   const { update, setCurrentStep } = useWizard()
   const navigate = useNavigate()
 
-  const [messages, setMessages] = useState<Msg[]>([WELCOME])
-  const [input, setInput] = useState('')
+  const [messages, setMessages]   = useState<Msg[]>([WELCOME])
+  const [input, setInput]         = useState('')
   const [streaming, setStreaming] = useState(false)
   const [finalizing, setFinalizing] = useState(false)
   const [finalized, setFinalized] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLTextAreaElement>(null)
+  const inputRef  = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => { setCurrentStep(4) }, [setCurrentStep])
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
-  async function sendMessage() {
+  async function send() {
     const text = input.trim()
     if (!text || streaming) return
     setInput('')
 
     const userMsg: Msg = { role: 'user', content: text }
     const history = [...messages, userMsg]
-    setMessages(history)
+    setMessages([...history, { role: 'assistant', content: '' }])
     setStreaming(true)
 
-    // Add empty assistant bubble to fill
     const assistantIdx = history.length
-    setMessages(prev => [...prev, { role: 'assistant', content: '' }])
 
     try {
       const response = await fetch('http://localhost:8000/api/chat/message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: history.map(m => ({ role: m.role, content: m.content })),
-        }),
+        body: JSON.stringify({ messages: history.map(m => ({ role: m.role, content: m.content })) }),
       })
-
-      if (!response.body) throw new Error('No stream body')
-      const reader = response.body.getReader()
+      const reader  = response.body!.getReader()
       const decoder = new TextDecoder()
-      let accumulated = ''
+      let acc = ''
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-        accumulated += decoder.decode(value, { stream: true })
+        acc += decoder.decode(value, { stream: true })
         setMessages(prev => {
-          const updated = [...prev]
-          updated[assistantIdx] = { role: 'assistant', content: accumulated }
-          return updated
+          const u = [...prev]
+          u[assistantIdx] = { role: 'assistant', content: acc }
+          return u
         })
       }
     } catch {
       setMessages(prev => {
-        const updated = [...prev]
-        updated[assistantIdx] = { role: 'assistant', content: 'Erro ao conectar. Verifique o backend.' }
-        return updated
+        const u = [...prev]
+        u[assistantIdx] = { role: 'assistant', content: 'Erro de conexao. Verifique o backend.' }
+        return u
       })
     } finally {
       setStreaming(false)
@@ -84,7 +76,7 @@ export default function TopicChat() {
     }
   }
 
-  async function handleFinalize() {
+  async function finalize() {
     setFinalizing(true)
     try {
       const res = await api.post('/api/chat/finalize', {
@@ -94,41 +86,27 @@ export default function TopicChat() {
       setFinalized(true)
     } catch {
       alert('Erro ao finalizar. Tente novamente.')
-    } finally {
-      setFinalizing(false)
-    }
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      sendMessage()
-    }
+    } finally { setFinalizing(false) }
   }
 
   return (
-    <Layout
-      title="Definir Tema"
-      subtitle="Converse com o assistente para definir o perfil do seu modelo"
-    >
-      <div className="max-w-2xl flex flex-col" style={{ height: 'calc(100vh - 140px)' }}>
+    <Layout title="Definir Tema" subtitle="Chat para definir o perfil de especializacao do modelo">
+      <div className="max-w-xl flex flex-col" style={{ height: 'calc(100vh - 120px)' }}>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto space-y-1 pb-4 scrollbar-thin">
-          {messages.map((msg, i) => (
-            <ChatMessage key={i} role={msg.role} content={msg.content} />
-          ))}
-          {streaming && messages[messages.length - 1]?.content === '' && (
-            <div className="flex justify-start mb-3">
-              <div className="bg-white border border-surface-200 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm">
-                <motion.div className="flex gap-1">
-                  {[0, 1, 2].map(i => (
-                    <motion.span
-                      key={i}
-                      className="w-1.5 h-1.5 bg-gray-400 rounded-full"
-                      animate={{ opacity: [0.3, 1, 0.3] }}
-                      transition={{ repeat: Infinity, duration: 1, delay: i * 0.2 }}
-                    />
+        <div className="flex-1 overflow-y-auto scrollbar-thin pb-3">
+          {messages.map((msg, i) => <ChatMessage key={i} role={msg.role} content={msg.content} />)}
+          {streaming && messages.at(-1)?.content === '' && (
+            <div className="flex justify-start mb-2">
+              <div className="w-6 h-6 rounded-sm bg-accent-500 flex items-center justify-center mr-2 mt-0.5">
+                <span className="text-white font-bold text-[10px]">S</span>
+              </div>
+              <div className="bg-white border border-surface-200 rounded px-3 py-2 shadow-card">
+                <motion.div className="flex gap-1 items-center h-4">
+                  {[0,1,2].map(i => (
+                    <motion.span key={i} className="w-1.5 h-1.5 bg-gray-400 rounded-sm"
+                      animate={{ opacity: [0.3,1,0.3] }}
+                      transition={{ repeat: Infinity, duration: 1, delay: i*0.2 }} />
                   ))}
                 </motion.div>
               </div>
@@ -137,20 +115,16 @@ export default function TopicChat() {
           <div ref={bottomRef} />
         </div>
 
-        {/* Input area */}
-        <div className="border-t border-surface-200 pt-4 space-y-3">
+        {/* Input */}
+        <div className="border-t border-surface-200 pt-3 space-y-2">
           {finalized ? (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl p-4"
-            >
-              <div className="flex items-center gap-2 text-green-700 text-sm font-medium">
-                <CheckCircle size={18} />
-                Perfil de tema definido com sucesso!
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              className="flex items-center justify-between bg-success-50 border border-green-200 rounded p-3">
+              <div className="flex items-center gap-1.5 text-success-600 text-sm font-medium">
+                <CheckCircle2 size={15} /> Tema definido com sucesso
               </div>
               <button onClick={() => navigate('/scraping/config')} className="btn-primary">
-                Proximo: Scraping <ChevronRight size={16} />
+                Ir para Scraping <ArrowRight size={14} />
               </button>
             </motion.div>
           ) : (
@@ -160,40 +134,30 @@ export default function TopicChat() {
                   ref={inputRef}
                   value={input}
                   onChange={e => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Digite sua mensagem... (Enter para enviar, Shift+Enter para nova linha)"
+                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
+                  placeholder="Enter para enviar · Shift+Enter para nova linha"
                   rows={2}
                   disabled={streaming}
-                  className="input resize-none flex-1 text-sm leading-relaxed"
+                  className="input resize-none flex-1 text-sm"
                 />
                 <button
-                  onClick={sendMessage}
+                  onClick={send}
                   disabled={!input.trim() || streaming}
-                  className="btn-primary h-10 w-10 p-0 justify-center flex-shrink-0"
+                  className="btn-primary h-[68px] w-10 p-0"
                 >
-                  <Send size={16} />
+                  <Send size={15} />
                 </button>
               </div>
-
               {messages.length >= 7 && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="flex justify-end"
-                >
-                  <button
-                    onClick={handleFinalize}
-                    disabled={finalizing || streaming}
-                    className="btn-secondary text-sm"
-                  >
-                    {finalizing ? 'Finalizando...' : 'Finalizar Definicao de Tema'}
+                <div className="flex justify-end">
+                  <button onClick={finalize} disabled={finalizing || streaming} className="btn-secondary text-xs">
+                    {finalizing ? 'Finalizando...' : 'Finalizar definicao de tema'}
                   </button>
-                </motion.div>
+                </div>
               )}
             </>
           )}
         </div>
-
       </div>
     </Layout>
   )

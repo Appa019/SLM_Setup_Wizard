@@ -1,182 +1,144 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CheckCircle, AlertCircle, ChevronRight } from 'lucide-react'
+import { CheckCircle2, AlertCircle, ArrowRight, Link2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Layout from '../components/Layout'
 import { useWizard } from '../context/WizardContext'
 
-interface ScrapingState {
-  running: boolean
-  total: number
-  done: number
-  failed: number
-  current_url: string
-  bytes_collected: number
-  start_time: number
-  finished: boolean
-  error: string
+interface ScrapeState {
+  running: boolean; total: number; done: number; failed: number
+  current_url: string; bytes_collected: number
+  start_time: number; finished: boolean; error: string
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+const fmtBytes = (b: number) => {
+  if (b < 1024) return `${b} B`
+  if (b < 1024**2) return `${(b/1024).toFixed(1)} KB`
+  return `${(b/1024**2).toFixed(1)} MB`
 }
 
-function formatEta(done: number, total: number, startTime: number): string {
-  if (done === 0) return 'calculando...'
-  const elapsed = (Date.now() / 1000) - startTime
-  const rate = done / elapsed
-  const remaining = (total - done) / rate
-  if (remaining < 60) return `~${Math.ceil(remaining)}s`
-  return `~${Math.ceil(remaining / 60)}min`
+const fmtEta = (done: number, total: number, t0: number) => {
+  if (!done) return '...'
+  const rate = done / ((Date.now()/1000) - t0)
+  const rem  = (total - done) / rate
+  return rem < 60 ? `${Math.ceil(rem)}s` : `${Math.ceil(rem/60)}min`
 }
 
 export default function ScrapingProgress() {
   const { setCurrentStep } = useWizard()
   const navigate = useNavigate()
-  const [state, setState] = useState<ScrapingState | null>(null)
-  const [recentUrls, setRecentUrls] = useState<string[]>([])
+  const [st, setSt] = useState<ScrapeState | null>(null)
+  const [log, setLog] = useState<string[]>([])
   const esRef = useRef<EventSource | null>(null)
 
   useEffect(() => {
     setCurrentStep(6)
     const es = new EventSource('http://localhost:8000/api/scraping/status')
     esRef.current = es
-
-    es.onmessage = (event) => {
-      const data: ScrapingState = JSON.parse(event.data)
-      setState(data)
-      if (data.current_url) {
-        setRecentUrls(prev => {
-          const next = [data.current_url, ...prev.filter(u => u !== data.current_url)]
-          return next.slice(0, 8)
-        })
-      }
+    es.onmessage = e => {
+      const d: ScrapeState = JSON.parse(e.data)
+      setSt(d)
+      if (d.current_url) setLog(prev => [d.current_url, ...prev].slice(0, 10))
     }
-
-    es.onerror = () => { es.close() }
-
-    return () => { es.close() }
+    es.onerror = () => es.close()
+    return () => es.close()
   }, [setCurrentStep])
 
-  const pct = state && state.total > 0
-    ? Math.round((state.done / state.total) * 100)
-    : 0
+  const pct = st && st.total > 0 ? Math.round((st.done / st.total) * 100) : 0
 
   return (
     <Layout title="Progresso do Scraping" subtitle="Coletando dados da web em tempo real">
-      <div className="max-w-2xl space-y-5">
+      <div className="max-w-xl space-y-4">
 
-        {/* Main progress */}
-        <div className="card space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-700">Progresso geral</span>
-            <span className="text-sm text-gray-500">
-              {state?.done ?? 0} / {state?.total ?? 0} URLs
-            </span>
+        {/* Progress bar */}
+        <div className="card space-y-3">
+          <div className="flex justify-between text-xs text-gray-500">
+            <span className="font-medium text-gray-700">URLs processadas</span>
+            <span>{st?.done ?? 0} / {st?.total ?? 0}</span>
           </div>
-
-          {/* Progress bar */}
-          <div className="relative h-3 bg-surface-200 rounded-full overflow-hidden">
+          <div className="h-2 bg-surface-200 rounded-sm overflow-hidden">
             <motion.div
-              className="absolute inset-y-0 left-0 bg-accent-500 rounded-full"
+              className="h-full bg-accent-500"
               animate={{ width: `${pct}%` }}
-              transition={{ duration: 0.5 }}
+              transition={{ duration: 0.4 }}
             />
           </div>
-
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-semibold text-accent-500 text-lg">{pct}%</span>
-            {state && !state.finished && state.total > 0 && (
-              <span className="text-gray-500 text-xs">
-                ETA: {formatEta(state.done, state.total, state.start_time)}
-              </span>
+          <div className="flex justify-between items-center">
+            <span className="font-bold text-accent-500 text-lg font-mono">{pct}%</span>
+            {st && !st.finished && st.total > 0 && (
+              <span className="text-[11px] text-gray-400">ETA: {fmtEta(st.done, st.total, st.start_time)}</span>
             )}
           </div>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-2">
           {[
-            { label: 'Coletadas', value: state?.done ?? 0, color: 'text-green-600' },
-            { label: 'Falhas', value: state?.failed ?? 0, color: 'text-red-500' },
-            { label: 'Volume', value: formatBytes(state?.bytes_collected ?? 0), color: 'text-accent-500' },
+            { label: 'Coletadas', value: st?.done ?? 0,                   color: 'text-success-600' },
+            { label: 'Falhas',    value: st?.failed ?? 0,                  color: 'text-danger-600' },
+            { label: 'Volume',    value: fmtBytes(st?.bytes_collected ?? 0), color: 'text-accent-500' },
           ].map(item => (
-            <div key={item.label} className="card text-center py-4">
-              <p className={`text-2xl font-bold ${item.color}`}>{item.value}</p>
-              <p className="text-xs text-gray-500 mt-1">{item.label}</p>
+            <div key={item.label} className="card-sm text-center py-3">
+              <p className={`text-xl font-bold font-mono ${item.color}`}>{item.value}</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">{item.label}</p>
             </div>
           ))}
         </div>
 
-        {/* Current URL */}
-        {state?.current_url && !state.finished && (
-          <div className="card space-y-3">
+        {/* Live URL log */}
+        {log.length > 0 && (
+          <div className="card-sm space-y-1.5">
+            <div className="flex items-center gap-1.5 section-title mb-2">
+              <Link2 size={11} /> URLs recentes
+            </div>
+            {log.map((url, i) => (
+              <p key={i} className={`text-[11px] font-mono truncate ${i === 0 ? 'text-gray-700' : 'text-gray-400'}`}>
+                {url}
+              </p>
+            ))}
+          </div>
+        )}
+
+        {/* Active indicator */}
+        {st?.running && st.current_url && (
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <motion.div
+              className="w-1.5 h-1.5 bg-green-500 rounded-sm flex-shrink-0"
+              animate={{ opacity: [1, 0.3, 1] }}
+              transition={{ repeat: Infinity, duration: 1.2 }}
+            />
+            Processando: <span className="font-mono text-gray-700 truncate">{st.current_url}</span>
+          </div>
+        )}
+
+        {/* Done */}
+        {st?.finished && (
+          <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+            className="flex items-center justify-between bg-success-50 border border-green-200 rounded p-4">
             <div className="flex items-center gap-2">
-              <motion.div
-                className="w-2 h-2 bg-green-500 rounded-full"
-                animate={{ opacity: [1, 0.3, 1] }}
-                transition={{ repeat: Infinity, duration: 1.2 }}
-              />
-              <span className="text-xs font-medium text-gray-600 uppercase tracking-wide">
-                Processando agora
-              </span>
-            </div>
-            <p className="text-xs font-mono text-gray-500 truncate">{state.current_url}</p>
-          </div>
-        )}
-
-        {/* Recent URLs log */}
-        {recentUrls.length > 0 && (
-          <div className="card space-y-2">
-            <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">
-              URLs recentes
-            </p>
-            <div className="space-y-1">
-              {recentUrls.map((url, i) => (
-                <p key={i} className="text-xs font-mono text-gray-400 truncate">{url}</p>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Finished */}
-        {state?.finished && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl p-5"
-          >
-            <div className="flex items-center gap-3">
-              <CheckCircle size={22} className="text-green-600" />
+              <CheckCircle2 size={18} className="text-success-600" />
               <div>
-                <p className="font-semibold text-green-800">Scraping concluido!</p>
-                <p className="text-sm text-green-600">
-                  {state.done} paginas · {formatBytes(state.bytes_collected)} coletados
-                </p>
+                <p className="font-semibold text-success-700 text-sm">Scraping concluido</p>
+                <p className="text-xs text-success-600">{st.done} paginas · {fmtBytes(st.bytes_collected)}</p>
               </div>
             </div>
             <button onClick={() => navigate('/preprocessing')} className="btn-primary">
-              Proximo: Pre-processar <ChevronRight size={16} />
+              Pre-processar <ArrowRight size={14} />
             </button>
           </motion.div>
         )}
 
-        {state?.error && (
-          <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl p-4 text-red-700 text-sm">
-            <AlertCircle size={18} />
-            {state.error}
+        {st?.error && (
+          <div className="flex items-center gap-2 bg-danger-50 border border-red-200 rounded p-3 text-danger-600 text-xs">
+            <AlertCircle size={15} /> {st.error}
           </div>
         )}
 
-        {/* Loading state */}
-        {!state && (
-          <div className="card text-center text-gray-500 text-sm py-8">
-            Aguardando inicio do scraping...
+        {!st && (
+          <div className="card text-center text-gray-400 text-sm py-10">
+            Aguardando conexao SSE...
           </div>
         )}
-
       </div>
     </Layout>
   )
