@@ -18,7 +18,13 @@ Aplicacao full-stack wizard para fine-tuning de LLMs locais.
 ## Logica GPU local vs Colab
 - user_vram > 15GB (T4) → gera `colab/local_training.py` + `requirements.txt`
 - user_vram <= 15GB ou sem GPU → gera `colab/generated_notebook.ipynb` + automacao Playwright
-- Decisao feita em `services/hyperparams.py` via GPT-5.4; fallback em `_conservative_defaults()`
+- **Enforcement em `routers/colab.py`** (deterministico, nao depende do GPT-5.4):
+  ```python
+  user_vram = body.hardware.get("vram_gb") or 0.0
+  params["training_target"] = "local" if user_vram > T4_VRAM_GB else "colab"
+  ```
+- GPT-5.4 otimiza lora_r/batch_size/etc; o router SEMPRE sobrescreve `training_target` com a regra real
+- `T4_VRAM_GB = 15.0` definido em `services/hyperparams.py` e importado pelo router
 
 ## Comandos
 - Backend: `cd backend && source ../.venv/bin/activate && uvicorn main:app --reload`
