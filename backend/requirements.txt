@@ -1,0 +1,12 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+openai==1.59.3
+beautifulsoup4==4.12.3
+httpx==0.28.1
+psutil==6.1.1
+gputil==1.4.0
+python-dotenv==1.0.1
+pydantic-settings==2.7.1
+sse-starlette==2.2.1
+playwright==1.49.1
+aiofiles==24.1.0
