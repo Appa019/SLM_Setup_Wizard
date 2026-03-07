@@ -39,6 +39,7 @@ export default function ScrapingProgress() {
       const d: ScrapeState = JSON.parse(e.data)
       setSt(d)
       if (d.current_url) setLog(prev => [d.current_url, ...prev].slice(0, 10))
+      if (d.finished || d.error) es.close()
     }
     es.onerror = () => es.close()
     return () => es.close()

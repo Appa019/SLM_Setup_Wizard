@@ -40,6 +40,13 @@ Aplicacao full-stack wizard para fine-tuning de LLMs locais.
 - Preprocessing `max_tokens=1100`
 - Write tool em arquivo existente requer Read primeiro, mesmo que parcial
 
+## Auditoria V2 (2026-03-07) — Bugs corrigidos
+- `cost_tracker.py`: adicionado `"gpt-5.2"` ao PRICING e `"model_recommendation"` ao PHASE_LABELS
+- `topic_chat.py`: `stream_chat()` agora chama `record()` no evento `response.completed`
+- `WizardContext.tsx`: `update` e `resetWizard` envolvidos com `useCallback(fn, [])` para estabilidade referencial
+- `09_Training.tsx`: deps do useEffect corrigidos para `[]` (evitava multiplas conexoes SSE)
+- `06_ScrapingProgress.tsx`: SSE fecha ao receber `d.finished || d.error` no onmessage
+
 ## Servicos V2 adicionados
 - `services/cost_tracker.py` — PRICING 2026, record(), get_history(), estimate_preprocessing()
 - `services/hyperparams.py` — GPT-5.4 + Dr Alex Chen prompt, gera hiperparametros + training_target

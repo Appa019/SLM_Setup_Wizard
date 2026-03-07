@@ -49,6 +49,12 @@ async def stream_chat(messages: list[dict]):
             delta = getattr(event, "delta", "")
             if delta:
                 yield delta
+        elif getattr(event, "type", "") == "response.completed":
+            usage = getattr(getattr(event, "response", None), "usage", None)
+            if usage:
+                record("gpt-4o-mini", "chat",
+                       getattr(usage, "input_tokens", 0),
+                       getattr(usage, "output_tokens", 0))
 
 
 async def finalize_topic(messages: list[dict]) -> dict:

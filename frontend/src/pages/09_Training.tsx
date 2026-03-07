@@ -30,7 +30,7 @@ export default function Training() {
     }
     es.onerror = () => es.close()
     return () => es.close()
-  }, [setCurrentStep, update])
+  }, [])
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: 'smooth' })

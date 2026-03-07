@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react'
+import { createContext, useCallback, useContext, useState } from 'react'
 import type { ReactNode } from 'react'
 
 export interface HardwareInfo {
@@ -50,13 +50,13 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<WizardState>(defaultState)
   const [currentStep, setCurrentStep] = useState(1)
 
-  const update = (patch: Partial<WizardState>) =>
-    setState(prev => ({ ...prev, ...patch }))
+  const update = useCallback((patch: Partial<WizardState>) =>
+    setState(prev => ({ ...prev, ...patch })), [])
 
-  const resetWizard = () => {
+  const resetWizard = useCallback(() => {
     setState(defaultState)
     setCurrentStep(1)
-  }
+  }, [])
 
   return (
     <WizardContext.Provider value={{ state, update, resetWizard, currentStep, setCurrentStep }}>

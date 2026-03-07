@@ -8,6 +8,7 @@ COSTS_FILE = Path(__file__).parent.parent.parent / "data" / "costs.jsonl"
 PRICING: dict[str, dict[str, float]] = {
     "gpt-5.4":       {"in": 7.50,  "out": 30.00},
     "gpt-5.4-pro":   {"in": 15.00, "out": 60.00},
+    "gpt-5.2":       {"in": 3.50,  "out": 14.00},
     "gpt-4o":        {"in": 2.50,  "out": 10.00},
     "gpt-4o-mini":   {"in": 0.15,  "out": 0.60},
     "gpt-4.1":       {"in": 2.00,  "out": 8.00},
@@ -18,11 +19,12 @@ PRICING: dict[str, dict[str, float]] = {
 }
 
 PHASE_LABELS = {
-    "recommendation": "Recomendacao de modelo",
-    "chat":           "Chat de tema",
-    "preprocessing":  "Pre-processamento",
-    "hyperparams":    "Hiperparametros (GPT-5.4)",
-    "other":          "Outros",
+    "recommendation":       "Recomendacao de modelo",
+    "model_recommendation": "Recomendacao de modelo",
+    "chat":                 "Chat de tema",
+    "preprocessing":        "Pre-processamento",
+    "hyperparams":          "Hiperparametros (GPT-5.4)",
+    "other":                "Outros",
 }
 
 
