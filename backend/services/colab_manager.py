@@ -43,10 +43,11 @@ def write_sidecar(slug: str, topic_profile: dict, model_id: str,
 
 def generate_notebook(model_id: str, topic_profile: dict,
                       params: dict | None = None,
-                      model_slug: str = "especialista") -> Path:
+                      model_slug: str = "especialista",
+                      hf_id: str = "") -> Path:
     """Gera notebook Colab com celula de configuracao dinamica da IA."""
     COLAB_DIR.mkdir(parents=True, exist_ok=True)
-    hf_model   = MODEL_MAP.get(model_id, "meta-llama/Llama-3.2-3B-Instruct")
+    hf_model   = hf_id if hf_id else MODEL_MAP.get(model_id, "meta-llama/Llama-3.2-3B-Instruct")
     topic_area = topic_profile.get("area", "conhecimento geral")
     p          = params or {}
     gguf_name  = f"{model_slug}.gguf"
@@ -270,10 +271,11 @@ def generate_notebook(model_id: str, topic_profile: dict,
 
 def generate_local_script(model_id: str, topic_profile: dict,
                            params: dict | None = None,
-                           model_slug: str = "especialista") -> Path:
+                           model_slug: str = "especialista",
+                           hf_id: str = "") -> Path:
     """Gera script Python puro para treinamento local (GPU usuario > T4)."""
     COLAB_DIR.mkdir(parents=True, exist_ok=True)
-    hf_model   = MODEL_MAP.get(model_id, "meta-llama/Llama-3.2-3B-Instruct")
+    hf_model   = hf_id if hf_id else MODEL_MAP.get(model_id, "meta-llama/Llama-3.2-3B-Instruct")
     topic_area = topic_profile.get("area", "conhecimento geral")
     p          = params or {}
     gguf_name = f"{model_slug}.gguf"

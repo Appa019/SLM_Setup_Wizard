@@ -16,6 +16,7 @@ export interface WizardState {
   hardware: HardwareInfo | null
   selectedModel: string
   selectedQuant: string
+  selectedHfId: string
   topicProfile: Record<string, unknown> | null
   scrapingConfig: { url_count: number; sources: string[] } | null
   trainingStatus: string
@@ -36,6 +37,7 @@ const defaultState: WizardState = {
   hardware: null,
   selectedModel: '',
   selectedQuant: 'q4_k_m',
+  selectedHfId: '',
   topicProfile: null,
   scrapingConfig: null,
   trainingStatus: '',

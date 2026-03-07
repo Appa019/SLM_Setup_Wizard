@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, ChevronUp, Check, ArrowRight } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { Check, ArrowRight, ExternalLink } from 'lucide-react'
+import { motion } from 'framer-motion'
 import Layout from '../components/Layout'
 import Loader from '../components/Loader'
 import { useWizard } from '../context/WizardContext'
@@ -11,21 +11,24 @@ interface QuantOption {
   type:          string
   label:         string
   vram_gb:       number
-  hf_id:         string
   compatibility: 'high' | 'medium' | 'low'
 }
 
 interface ModelRec {
-  id:            string
-  name:          string
-  params:        string
-  description:   string
-  compatibility: 'high' | 'medium' | 'low'
+  id:             string
+  name:           string
+  params:         string
+  family:         string
+  hf_id:          string
+  description:    string
+  context_window: number
+  license:        string
+  compatibility:  'high' | 'medium' | 'low'
   selected_quant: string
-  quant_options: QuantOption[]
-  pros?:         string[]
-  cons?:         string[]
-  best_for?:     string
+  quant_options:  QuantOption[]
+  pros?:          string[]
+  cons?:          string[]
+  best_for?:      string
 }
 
 const COMPAT: Record<string, { label: string; cls: string }> = {
@@ -34,22 +37,21 @@ const COMPAT: Record<string, { label: string; cls: string }> = {
   low:    { label: 'Insuficiente', cls: 'badge-red'    },
 }
 
-const QUANT_COMPAT: Record<string, string> = {
-  high:   'badge-green',
-  medium: 'badge-yellow',
-  low:    'badge-red',
+function fmtCtx(n: number): string {
+  if (n >= 1000000) return `${(n / 1000000).toFixed(0)}M ctx`
+  if (n >= 1000)    return `${(n / 1000).toFixed(0)}k ctx`
+  return `${n} ctx`
 }
 
 export default function ModelSelection() {
   const { state, update, setCurrentStep } = useWizard()
   const navigate = useNavigate()
 
-  const [models, setModels]             = useState<ModelRec[]>([])
-  const [selected, setSelected]         = useState('')
+  const [models, setModels]               = useState<ModelRec[]>([])
+  const [selected, setSelected]           = useState('')
   const [selectedQuant, setSelectedQuant] = useState<Record<string, string>>({})
-  const [expanded, setExpanded]         = useState<string | null>(null)
-  const [loading, setLoading]           = useState(true)
-  const [error, setError]               = useState('')
+  const [loading, setLoading]             = useState(true)
+  const [error, setError]                 = useState('')
 
   useEffect(() => {
     setCurrentStep(3)
@@ -62,7 +64,6 @@ export default function ModelSelection() {
       .then(res => {
         const recs = res.data.recommendations
         setModels(recs)
-        // Pre-selecionar variante recomendada pela IA
         const defaults: Record<string, string> = {}
         recs.forEach(m => { defaults[m.id] = m.selected_quant })
         setSelectedQuant(defaults)
@@ -71,11 +72,12 @@ export default function ModelSelection() {
       .catch(() => { setError('Erro ao obter recomendacoes'); setLoading(false) })
   }, [setCurrentStep, state.hardware])
 
-  function selectModel(id: string, m: ModelRec) {
-    setSelected(id)
+  function selectModel(m: ModelRec) {
+    setSelected(m.id)
     update({
-      selectedModel: id,
-      selectedQuant: selectedQuant[id] ?? m.selected_quant,
+      selectedModel: m.id,
+      selectedHfId:  m.hf_id,
+      selectedQuant: selectedQuant[m.id] ?? m.selected_quant,
     })
   }
 
@@ -87,23 +89,22 @@ export default function ModelSelection() {
   }
 
   return (
-    <Layout title="Selecionar Modelo" subtitle="Modelos recomendados para o seu hardware">
+    <Layout title="Selecionar Modelo" subtitle="Modelos escolhidos pelo GPT-5.4 para o seu hardware">
       <div className="max-w-xl space-y-3">
-        {loading && <Loader message="Consultando recomendacoes..." />}
-        {error && <div className="card border-red-200 bg-danger-50 text-danger-600 text-xs p-3">{error}</div>}
+        {loading && <Loader message="GPT-5.4 analisando seu hardware..." />}
+        {error   && <div className="card border-red-200 bg-danger-50 text-danger-600 text-xs p-3">{error}</div>}
 
         {models.map((m, i) => {
           const compat     = COMPAT[m.compatibility] ?? COMPAT.medium
           const isSelected = selected === m.id
-          const isExpanded = expanded === m.id
 
           return (
             <motion.div
               key={m.id}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.06 }}
-              onClick={() => selectModel(m.id, m)}
+              transition={{ delay: i * 0.07 }}
+              onClick={() => selectModel(m)}
               className={`card cursor-pointer transition-colors duration-100 border-2
                 ${isSelected
                   ? 'border-accent-500 bg-accent-50'
@@ -116,26 +117,81 @@ export default function ModelSelection() {
                   {isSelected && <Check size={10} color="white" strokeWidth={3} />}
                 </div>
 
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-gray-900 text-sm">{m.name}</span>
-                    <span className="code">{m.params}</span>
-                    <span className={compat.cls}>{compat.label}</span>
+                <div className="flex-1 min-w-0 space-y-3">
+
+                  {/* Header */}
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-gray-900 text-sm">{m.name}</span>
+                      <span className="code">{m.params}</span>
+                      {m.family && <span className="code">{m.family}</span>}
+                      <span className={compat.cls}>{compat.label}</span>
+                      {i === 0 && (
+                        <span className="badge-green text-[10px]">Recomendado IA</span>
+                      )}
+                    </div>
+
+                    {/* Meta row */}
+                    <div className="flex items-center gap-3 mt-1.5 flex-wrap text-[11px] text-gray-400">
+                      {m.context_window > 0 && (
+                        <span>{fmtCtx(m.context_window)}</span>
+                      )}
+                      {m.license && <span>· {m.license}</span>}
+                      {m.hf_id && (
+                        <a
+                          href={`https://huggingface.co/${m.hf_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={e => e.stopPropagation()}
+                          className="flex items-center gap-0.5 text-accent-500 hover:text-accent-600"
+                        >
+                          <ExternalLink size={10} />
+                          {m.hf_id}
+                        </a>
+                      )}
+                    </div>
+
+                    <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">{m.description}</p>
+                    {m.best_for && (
+                      <p className="text-[11px] text-accent-500 mt-1 font-medium">
+                        Ideal para: {m.best_for}
+                      </p>
+                    )}
                   </div>
-                  <p className="text-xs text-gray-500 mt-1 leading-relaxed">{m.description}</p>
-                  {m.best_for && (
-                    <p className="text-[11px] text-accent-500 mt-1 font-medium">
-                      Ideal para: {m.best_for}
-                    </p>
+
+                  {/* Pros / Cons */}
+                  {((m.pros && m.pros.length > 0) || (m.cons && m.cons.length > 0)) && (
+                    <div className="grid grid-cols-2 gap-2 text-[11px]">
+                      {m.pros && m.pros.length > 0 && (
+                        <div className="space-y-0.5">
+                          <p className="font-semibold text-success-600 mb-1">Pontos positivos</p>
+                          {m.pros.map((p, j) => (
+                            <p key={j} className="text-gray-600 flex gap-1">
+                              <span className="text-success-600 flex-shrink-0">+</span>{p}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                      {m.cons && m.cons.length > 0 && (
+                        <div className="space-y-0.5">
+                          <p className="font-semibold text-danger-600 mb-1">Limitacoes</p>
+                          {m.cons.map((c, j) => (
+                            <p key={j} className="text-gray-600 flex gap-1">
+                              <span className="text-danger-600 flex-shrink-0">-</span>{c}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
 
-                  {/* Quant variants table */}
-                  <div className="mt-3 pt-3 border-t border-surface-200" onClick={e => e.stopPropagation()}>
+                  {/* Quant variants */}
+                  <div onClick={e => e.stopPropagation()}>
                     <p className="section-title mb-2">Variantes disponíveis</p>
                     <div className="space-y-1">
-                      {m.quant_options.map((opt) => {
+                      {m.quant_options.map(opt => {
                         const isVariantSelected = selectedQuant[m.id] === opt.type
-                        const compatCls         = QUANT_COMPAT[opt.compatibility] ?? 'badge-gray'
+                        const qCompat = COMPAT[opt.compatibility] ?? COMPAT.medium
                         return (
                           <label
                             key={opt.type}
@@ -153,9 +209,9 @@ export default function ModelSelection() {
                               onChange={() => selectVariant(m.id, opt.type)}
                               className="accent-accent-500"
                             />
-                            <span className="font-mono font-medium text-gray-800 w-28 flex-shrink-0">{opt.label}</span>
+                            <span className="font-mono font-medium text-gray-800 w-32 flex-shrink-0">{opt.label}</span>
                             <span className="text-gray-500">{opt.vram_gb} GB VRAM</span>
-                            <span className={`ml-auto ${compatCls}`}>
+                            <span className={`ml-auto ${qCompat.cls}`}>
                               {opt.compatibility === 'high' ? 'OK' : opt.compatibility === 'medium' ? 'Limite' : 'Insuf.'}
                             </span>
                           </label>
@@ -163,49 +219,9 @@ export default function ModelSelection() {
                       })}
                     </div>
                   </div>
+
                 </div>
-
-                <button
-                  onClick={e => { e.stopPropagation(); setExpanded(prev => prev === m.id ? null : m.id) }}
-                  className="text-gray-400 hover:text-gray-600 flex-shrink-0 mt-0.5"
-                >
-                  {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-                </button>
               </div>
-
-              <AnimatePresence>
-                {isExpanded && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="overflow-hidden"
-                  >
-                    <div className="mt-3 pt-3 border-t border-surface-200 grid grid-cols-2 gap-3 text-xs">
-                      {m.pros && m.pros.length > 0 && (
-                        <div>
-                          <p className="font-semibold text-success-600 mb-1">Pontos positivos</p>
-                          {m.pros.map((p, j) => (
-                            <p key={j} className="text-gray-600 flex gap-1 mb-0.5">
-                              <span className="text-success-600">+</span>{p}
-                            </p>
-                          ))}
-                        </div>
-                      )}
-                      {m.cons && m.cons.length > 0 && (
-                        <div>
-                          <p className="font-semibold text-danger-600 mb-1">Limitacoes</p>
-                          {m.cons.map((c, j) => (
-                            <p key={j} className="text-gray-600 flex gap-1 mb-0.5">
-                              <span className="text-danger-600">−</span>{c}
-                            </p>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
             </motion.div>
           )
         })}

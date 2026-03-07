@@ -66,6 +66,7 @@ export default function ColabConnect() {
       }>('/api/colab/start', {
         model_id:      state.selectedModel || 'llama-3.2-3b',
         quant_type:    state.selectedQuant  || 'q4_k_m',
+        hf_id:         state.selectedHfId  ?? '',
         topic_profile: state.topicProfile   ?? {},
         hardware:      state.hardware       ?? {},
       })

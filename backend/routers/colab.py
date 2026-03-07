@@ -18,6 +18,7 @@ MODELS_DIR     = PROJECT_ROOT / "models"
 class ColabStartRequest(BaseModel):
     model_id:      str  = "llama-3.2-3b"
     quant_type:    str  = "q4_k_m"
+    hf_id:         str  = ""
     topic_profile: dict = {}
     hardware:      dict = {}
 
@@ -26,7 +27,7 @@ class ColabStartRequest(BaseModel):
 async def generate_colab_notebook(body: ColabStartRequest):
     topic_area    = body.topic_profile.get("area", "especialista")
     model_slug    = make_slug(topic_area, body.model_id)
-    notebook_path = generate_notebook(body.model_id, body.topic_profile, model_slug=model_slug)
+    notebook_path = generate_notebook(body.model_id, body.topic_profile, model_slug=model_slug, hf_id=body.hf_id)
     return {
         "ok": True,
         "notebook_path": str(notebook_path),
@@ -97,7 +98,7 @@ async def start_colab(body: ColabStartRequest, background_tasks: BackgroundTasks
 
     # Se GPU do usuario for superior ao T4 → script local
     if training_target == "local":
-        script_path = generate_local_script(body.model_id, body.topic_profile, params, model_slug)
+        script_path = generate_local_script(body.model_id, body.topic_profile, params, model_slug, hf_id=body.hf_id)
         return {
             "ok":          True,
             "target":      "local",
@@ -107,7 +108,7 @@ async def start_colab(body: ColabStartRequest, background_tasks: BackgroundTasks
         }
 
     # Caso contrario → notebook Colab + automacao Playwright
-    notebook_path = generate_notebook(body.model_id, body.topic_profile, params, model_slug)
+    notebook_path = generate_notebook(body.model_id, body.topic_profile, params, model_slug, hf_id=body.hf_id)
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     background_tasks.add_task(run_colab_automation, notebook_path, dataset_path, MODELS_DIR)
     return {
