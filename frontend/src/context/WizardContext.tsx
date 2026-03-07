@@ -25,6 +25,7 @@ export interface WizardState {
 interface WizardContextValue {
   state: WizardState
   update: (patch: Partial<WizardState>) => void
+  resetWizard: () => void
   currentStep: number
   setCurrentStep: (step: number) => void
 }
@@ -50,8 +51,13 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   const update = (patch: Partial<WizardState>) =>
     setState(prev => ({ ...prev, ...patch }))
 
+  const resetWizard = () => {
+    setState(defaultState)
+    setCurrentStep(1)
+  }
+
   return (
-    <WizardContext.Provider value={{ state, update, currentStep, setCurrentStep }}>
+    <WizardContext.Provider value={{ state, update, resetWizard, currentStep, setCurrentStep }}>
       {children}
     </WizardContext.Provider>
   )
