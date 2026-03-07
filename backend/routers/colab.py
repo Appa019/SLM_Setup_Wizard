@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from services.colab_manager import generate_notebook, generate_local_script
 from services.colab_playwright import run_colab_automation, get_training_state
-from services.hyperparams import generate_hyperparams
+from services.hyperparams import generate_hyperparams, T4_VRAM_GB
 
 router = APIRouter()
 
@@ -57,7 +57,24 @@ async def start_colab(body: ColabStartRequest, background_tasks: BackgroundTasks
         dataset_pairs=dataset_pairs,
     )
 
-    training_target = params.get("training_target", "colab")
+    # Enforcement deterministico da regra GPU — nao depende so do GPT-5.4.
+    # O GPT-5.4 otimiza lora_r, batch_size, etc., mas a decisao de onde treinar
+    # e sempre determinada pelo hardware real do usuario.
+    user_vram: float = body.hardware.get("vram_gb") or 0.0
+    if user_vram > T4_VRAM_GB:
+        params["training_target"] = "local"
+        params["training_target_reason"] = (
+            f"GPU do usuario ({user_vram}GB VRAM) supera o T4 ({T4_VRAM_GB}GB) — "
+            "treinamento local mais rapido e eficiente."
+        )
+    else:
+        params["training_target"] = "colab"
+        params["training_target_reason"] = (
+            f"VRAM do usuario ({user_vram}GB) <= T4 ({T4_VRAM_GB}GB) — "
+            "usando Colab T4 gratuito."
+        )
+
+    training_target = params["training_target"]
 
     # Se GPU do usuario for superior ao T4 → script local
     if training_target == "local":
