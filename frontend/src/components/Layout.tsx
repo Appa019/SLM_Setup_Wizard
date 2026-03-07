@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { motion } from 'framer-motion'
 import Stepper from './Stepper'
+import CostPanel from './CostPanel'
 
 interface LayoutProps {
   children: ReactNode
@@ -60,6 +61,7 @@ export default function Layout({ children, title, subtitle, actions }: LayoutPro
           {children}
         </motion.div>
       </main>
+      <CostPanel />
     </div>
   )
 }
