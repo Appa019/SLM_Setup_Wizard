@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CheckCircle2, AlertCircle, ArrowRight, Sparkles } from 'lucide-react'
+import { CheckCircle2, AlertCircle, ArrowRight, Sparkles, Clock } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Layout from '../components/Layout'
 import { useWizard } from '../context/WizardContext'
@@ -18,7 +18,12 @@ export default function Preprocessing() {
   const [ppState, setPPState] = useState<PPState | null>(null)
   const [started, setStarted] = useState(false)
   const [starting, setStarting] = useState(false)
+  const [scrapingDone, setScrapingDone] = useState<boolean | null>(null)
   const esRef = useRef<EventSource | null>(null)
+
+  useEffect(() => {
+    api.get('/api/scraping/state').then(r => setScrapingDone(r.data.finished ?? false)).catch(() => setScrapingDone(false))
+  }, [])
 
   useEffect(() => { setCurrentStep(7) }, [setCurrentStep])
   useEffect(() => () => esRef.current?.close(), [])
@@ -53,6 +58,12 @@ export default function Preprocessing() {
         {/* Not started */}
         {!started && (
           <div className="card space-y-4">
+            {scrapingDone === false && (
+              <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded p-3 text-amber-700 text-xs">
+                <Clock size={14} className="flex-shrink-0" />
+                <span>Finalize o scraping antes de iniciar o pre-processamento. Volte para a etapa anterior.</span>
+              </div>
+            )}
             <h3 className="text-sm font-semibold text-gray-900 border-b border-surface-200 pb-2">
               Como funciona
             </h3>
@@ -72,7 +83,7 @@ export default function Preprocessing() {
               ))}
             </div>
             <div className="flex justify-end border-t border-surface-200 pt-3">
-              <button onClick={start} disabled={starting} className="btn-primary">
+              <button onClick={start} disabled={starting || scrapingDone === false} className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed">
                 {starting ? 'Iniciando...' : 'Iniciar Pre-processamento'}
               </button>
             </div>

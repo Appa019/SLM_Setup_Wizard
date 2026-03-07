@@ -53,20 +53,18 @@ Retorne apenas um array JSON valido. Exemplo:
 
 async def _process_chunk(client: AsyncOpenAI, chunk: str, topic: str) -> list[dict]:
     try:
-        response = await client.chat.completions.create(
+        response = await client.responses.create(
             model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"Topico: {topic}\n\nTexto:\n{chunk}"},
-            ],
-            max_tokens=1100,
-            temperature=0.7,
+            instructions=SYSTEM_PROMPT,
+            input=f"Topico: {topic}\n\nTexto:\n{chunk}",
+            max_output_tokens=1100,
         )
-        usage = response.usage
+        usage = getattr(response, "usage", None)
         if usage:
-            record("gpt-4o-mini", "preprocessing", usage.prompt_tokens, usage.completion_tokens)
-        content = response.choices[0].message.content or "[]"
-        # Extract JSON array from response
+            record("gpt-4o-mini", "preprocessing",
+                   getattr(usage, "input_tokens", 0),
+                   getattr(usage, "output_tokens", 0))
+        content = response.output_text or "[]"
         start = content.find("[")
         end = content.rfind("]") + 1
         if start >= 0 and end > start:

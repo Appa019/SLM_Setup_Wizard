@@ -5,7 +5,7 @@ import re
 import time
 from collections import defaultdict
 from pathlib import Path
-from urllib.parse import quote_plus, urlparse
+from urllib.parse import parse_qs, quote_plus, unquote, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
@@ -117,19 +117,29 @@ def _clean_text(html: str) -> str | None:
     return text[:8000] if len(text) >= 200 else None
 
 
+_SKIP_DOMAINS = [
+    "google.com", "duckduckgo.com", "brave.com",
+    "facebook.com", "twitter.com", "instagram.com",
+    "youtube.com", "tiktok.com", "reddit.com",
+]
+_SKIP_PATTERNS = ["y.js?ad_domain", "javascript:", "mailto:", "/ads/", "?ad=", "&ad="]
+
+
 def _extract_links(html: str) -> list[str]:
     soup = BeautifulSoup(html, "html.parser")
     links = []
     for a in soup.find_all("a", href=True):
         href = a["href"]
-        if href.startswith("http") and not any(
-            skip in href for skip in [
-                "google.com", "duckduckgo.com", "brave.com",
-                "facebook.com", "twitter.com", "instagram.com", "ads.",
-                "javascript:", "mailto:",
-            ]
-        ):
-            links.append(href)
+        # Decode DuckDuckGo redirect: //duckduckgo.com/l/?uddg=ENCODED_URL
+        if "duckduckgo.com/l/" in href:
+            parsed = urlparse("https:" + href if href.startswith("//") else href)
+            uddg = parse_qs(parsed.query).get("uddg", [""])
+            href = unquote(uddg[0]) if uddg[0] else ""
+        if not href.startswith("http"):
+            continue
+        if any(skip in href for skip in _SKIP_DOMAINS + _SKIP_PATTERNS):
+            continue
+        links.append(href)
     return list(dict.fromkeys(links))[:25]
 
 

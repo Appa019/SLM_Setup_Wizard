@@ -160,9 +160,10 @@ async def get_recommendations(hardware: dict) -> list[dict]:
     try:
         client   = AsyncOpenAI(api_key=settings.openai_api_key)
         response = await client.responses.create(
-            model="gpt-5.4",
-            reasoning={"effort": "high"},
+            model="gpt-5.2",
+            reasoning={"effort": "medium"},
             store=True,
+            tools=[{"type": "web_search_preview"}],
             input=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user",   "content": user_message},
@@ -172,7 +173,7 @@ async def get_recommendations(hardware: dict) -> list[dict]:
         usage = getattr(response, "usage", None)
         if usage:
             record(
-                "gpt-5.4", "model_recommendation",
+                "gpt-5.2", "model_recommendation",
                 getattr(usage, "input_tokens", 0),
                 getattr(usage, "output_tokens", 0),
             )

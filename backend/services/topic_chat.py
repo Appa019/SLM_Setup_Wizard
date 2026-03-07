@@ -37,34 +37,37 @@ def get_client() -> AsyncOpenAI:
 
 async def stream_chat(messages: list[dict]):
     client = get_client()
-    full_messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
-    stream = await client.chat.completions.create(
+    stream = await client.responses.create(
         model="gpt-4o-mini",
-        messages=full_messages,
+        instructions=SYSTEM_PROMPT,
+        input=messages,
         stream=True,
-        max_tokens=600,
+        max_output_tokens=600,
     )
-    async for chunk in stream:
-        delta = chunk.choices[0].delta.content
-        if delta:
-            yield delta
+    async for event in stream:
+        if getattr(event, "type", "") == "response.output_text.delta":
+            delta = getattr(event, "delta", "")
+            if delta:
+                yield delta
 
 
 async def finalize_topic(messages: list[dict]) -> dict:
     client = get_client()
-    full_messages = (
-        [{"role": "system", "content": SYSTEM_PROMPT}]
-        + messages
-        + [{"role": "user", "content": FINALIZE_PROMPT}]
-    )
-    response = await client.chat.completions.create(
+    input_with_finalize = messages + [{"role": "user", "content": FINALIZE_PROMPT}]
+    response = await client.responses.create(
         model="gpt-4o-mini",
-        messages=full_messages,
-        response_format={"type": "json_object"},
-        max_tokens=800,
+        instructions=SYSTEM_PROMPT,
+        input=input_with_finalize,
+        max_output_tokens=800,
     )
-    usage = response.usage
+    usage = getattr(response, "usage", None)
     if usage:
-        record("gpt-4o-mini", "chat", usage.prompt_tokens, usage.completion_tokens)
-    content = response.choices[0].message.content or "{}"
-    return json.loads(content)
+        record("gpt-4o-mini", "chat",
+               getattr(usage, "input_tokens", 0),
+               getattr(usage, "output_tokens", 0))
+    content = response.output_text or "{}"
+    start = content.find("{")
+    end   = content.rfind("}") + 1
+    if start >= 0 and end > start:
+        return json.loads(content[start:end])
+    return {}

@@ -4,6 +4,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from services.preprocessor import run_preprocessing, get_state
+from services.scraper import get_state as get_scraping_state
 from config import settings
 
 router = APIRouter()
@@ -17,6 +18,9 @@ class PreprocessRequest(BaseModel):
 async def start_preprocessing(body: PreprocessRequest, background_tasks: BackgroundTasks):
     if not settings.openai_api_key:
         raise HTTPException(status_code=400, detail="Configure a OpenAI API Key primeiro")
+    scraping = get_scraping_state()
+    if not scraping.get("finished"):
+        raise HTTPException(status_code=400, detail="Aguarde o scraping finalizar antes de pre-processar")
     state = get_state()
     if state["running"]:
         raise HTTPException(status_code=409, detail="Preprocessing ja em execucao")

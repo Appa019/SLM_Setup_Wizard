@@ -11,7 +11,11 @@ def save_openai_key(api_key: str):
 async def validate_openai_key(api_key: str) -> bool:
     try:
         client = AsyncOpenAI(api_key=api_key)
-        await client.models.list()
+        await client.responses.create(
+            model="gpt-4o-mini",
+            input="hi",
+            max_output_tokens=16,
+        )
         return True
     except Exception:
         return False
