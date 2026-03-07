@@ -1,4 +1,5 @@
 import asyncio
+import json
 import subprocess
 import shutil
 from pathlib import Path
@@ -11,14 +12,31 @@ _server_port: int = 8080
 
 
 def find_gguf_models() -> list[dict]:
-    """List all .gguf files in models/ directory."""
+    """Lista todos os .gguf em models/, enriquecendo com sidecar .json se existir."""
     if not MODELS_DIR.exists():
         return []
     models = []
     for f in MODELS_DIR.glob("*.gguf"):
-        size_gb = round(f.stat().st_size / (1024 ** 3), 2)
-        models.append({"name": f.name, "path": str(f), "size_gb": size_gb})
-    return sorted(models, key=lambda m: m["name"])
+        size_gb  = round(f.stat().st_size / (1024 ** 3), 2)
+        sidecar  = f.with_suffix(".json")
+        meta: dict = {}
+        if sidecar.exists():
+            try:
+                meta = json.loads(sidecar.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        models.append({
+            "name":            f.name,
+            "path":            str(f),
+            "size_gb":         size_gb,
+            "topic":           meta.get("topic", f.stem),
+            "base_model":      meta.get("base_model", ""),
+            "quant_type":      meta.get("quant_type", ""),
+            "training_target": meta.get("training_target", ""),
+            "created_at":      meta.get("created_at", ""),
+            "subtopics":       meta.get("subtopics", []),
+        })
+    return sorted(models, key=lambda m: m.get("created_at", m["name"]), reverse=True)
 
 
 def is_llama_available() -> bool:
