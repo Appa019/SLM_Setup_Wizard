@@ -1,5 +1,6 @@
 import json
 from utils.openai_client import get_openai_client
+from services.cost_tracker import record
 
 CANDIDATE_MODELS = [
     {
@@ -88,6 +89,9 @@ Use apenas os IDs da lista: {[c['id'] for c in candidates]}"""
             response_format={"type": "json_object"},
             max_tokens=600,
         )
+        usage = response.usage
+        if usage:
+            record("gpt-4o-mini", "recommendation", usage.prompt_tokens, usage.completion_tokens)
         enriched = json.loads(response.choices[0].message.content or "{}")
         recs = enriched.get("recommendations", [])
 

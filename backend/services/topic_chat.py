@@ -1,6 +1,7 @@
 import json
 from openai import AsyncOpenAI
 from config import settings
+from services.cost_tracker import record
 
 SYSTEM_PROMPT = """Voce e um assistente especializado em ajudar usuarios a definir o tema
 para fine-tuning de um modelo de linguagem local (LLM).
@@ -62,5 +63,8 @@ async def finalize_topic(messages: list[dict]) -> dict:
         response_format={"type": "json_object"},
         max_tokens=800,
     )
+    usage = response.usage
+    if usage:
+        record("gpt-4o-mini", "chat", usage.prompt_tokens, usage.completion_tokens)
     content = response.choices[0].message.content or "{}"
     return json.loads(content)

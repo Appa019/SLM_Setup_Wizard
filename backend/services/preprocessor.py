@@ -5,6 +5,7 @@ from pathlib import Path
 
 from openai import AsyncOpenAI
 from config import settings
+from services.cost_tracker import record
 
 DATA_RAW = Path(__file__).parent.parent.parent / "data" / "raw"
 DATA_PROCESSED = Path(__file__).parent.parent.parent / "data" / "processed"
@@ -61,6 +62,9 @@ async def _process_chunk(client: AsyncOpenAI, chunk: str, topic: str) -> list[di
             max_tokens=800,
             temperature=0.7,
         )
+        usage = response.usage
+        if usage:
+            record("gpt-4o-mini", "preprocessing", usage.prompt_tokens, usage.completion_tokens)
         content = response.choices[0].message.content or "[]"
         # Extract JSON array from response
         start = content.find("[")

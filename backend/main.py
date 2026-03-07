@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import settings, hardware, models, chat, scraping, preprocessing, colab, training
+from routers import settings, hardware, models, chat, scraping, preprocessing, colab, training, costs
 
 app = FastAPI(title="Modelo SLM Local", version="0.1.0")
 
@@ -21,6 +21,7 @@ app.include_router(scraping.router, prefix="/api/scraping", tags=["scraping"])
 app.include_router(preprocessing.router, prefix="/api/preprocessing", tags=["preprocessing"])
 app.include_router(colab.router, prefix="/api/colab", tags=["colab"])
 app.include_router(training.router, prefix="/api/training", tags=["training"])
+app.include_router(costs.router, prefix="/api/costs", tags=["costs"])
 
 
 @app.get("/api/health")
