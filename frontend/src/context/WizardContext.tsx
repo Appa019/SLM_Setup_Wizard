@@ -15,6 +15,7 @@ export interface WizardState {
   googleEmail: string
   hardware: HardwareInfo | null
   selectedModel: string
+  selectedQuant: string
   topicProfile: Record<string, unknown> | null
   scrapingConfig: { url_count: number; sources: string[] } | null
   trainingStatus: string
@@ -33,6 +34,7 @@ const defaultState: WizardState = {
   googleEmail: '',
   hardware: null,
   selectedModel: '',
+  selectedQuant: 'q4_k_m',
   topicProfile: null,
   scrapingConfig: null,
   trainingStatus: '',

@@ -7,16 +7,25 @@ import Loader from '../components/Loader'
 import { useWizard } from '../context/WizardContext'
 import api from '../lib/api'
 
-interface ModelRec {
-  id: string
-  name: string
-  params: string
-  size_gb: number
-  description: string
+interface QuantOption {
+  type:          string
+  label:         string
+  vram_gb:       number
+  hf_id:         string
   compatibility: 'high' | 'medium' | 'low'
-  pros?: string[]
-  cons?: string[]
-  best_for?: string
+}
+
+interface ModelRec {
+  id:            string
+  name:          string
+  params:        string
+  description:   string
+  compatibility: 'high' | 'medium' | 'low'
+  selected_quant: string
+  quant_options: QuantOption[]
+  pros?:         string[]
+  cons?:         string[]
+  best_for?:     string
 }
 
 const COMPAT: Record<string, { label: string; cls: string }> = {
@@ -25,14 +34,22 @@ const COMPAT: Record<string, { label: string; cls: string }> = {
   low:    { label: 'Insuficiente', cls: 'badge-red'    },
 }
 
+const QUANT_COMPAT: Record<string, string> = {
+  high:   'badge-green',
+  medium: 'badge-yellow',
+  low:    'badge-red',
+}
+
 export default function ModelSelection() {
   const { state, update, setCurrentStep } = useWizard()
-  const navigate  = useNavigate()
-  const [models, setModels]     = useState<ModelRec[]>([])
-  const [selected, setSelected] = useState('')
-  const [expanded, setExpanded] = useState<string | null>(null)
-  const [loading, setLoading]   = useState(true)
-  const [error, setError]       = useState('')
+  const navigate = useNavigate()
+
+  const [models, setModels]             = useState<ModelRec[]>([])
+  const [selected, setSelected]         = useState('')
+  const [selectedQuant, setSelectedQuant] = useState<Record<string, string>>({})
+  const [expanded, setExpanded]         = useState<string | null>(null)
+  const [loading, setLoading]           = useState(true)
+  const [error, setError]               = useState('')
 
   useEffect(() => {
     setCurrentStep(3)
@@ -42,11 +59,32 @@ export default function ModelSelection() {
       vram_gb: hw?.vram_gb ?? null,
       gpu:     hw?.gpu     ?? null,
     })
-      .then(res => { setModels(res.data.recommendations); setLoading(false) })
+      .then(res => {
+        const recs = res.data.recommendations
+        setModels(recs)
+        // Pre-selecionar variante recomendada pela IA
+        const defaults: Record<string, string> = {}
+        recs.forEach(m => { defaults[m.id] = m.selected_quant })
+        setSelectedQuant(defaults)
+        setLoading(false)
+      })
       .catch(() => { setError('Erro ao obter recomendacoes'); setLoading(false) })
   }, [setCurrentStep, state.hardware])
 
-  function select(id: string) { setSelected(id); update({ selectedModel: id }) }
+  function selectModel(id: string, m: ModelRec) {
+    setSelected(id)
+    update({
+      selectedModel: id,
+      selectedQuant: selectedQuant[id] ?? m.selected_quant,
+    })
+  }
+
+  function selectVariant(modelId: string, quantType: string) {
+    setSelectedQuant(prev => ({ ...prev, [modelId]: quantType }))
+    if (selected === modelId) {
+      update({ selectedQuant: quantType })
+    }
+  }
 
   return (
     <Layout title="Selecionar Modelo" subtitle="Modelos recomendados para o seu hardware">
@@ -65,7 +103,7 @@ export default function ModelSelection() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.06 }}
-              onClick={() => select(m.id)}
+              onClick={() => selectModel(m.id, m)}
               className={`card cursor-pointer transition-colors duration-100 border-2
                 ${isSelected
                   ? 'border-accent-500 bg-accent-50'
@@ -81,7 +119,7 @@ export default function ModelSelection() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-semibold text-gray-900 text-sm">{m.name}</span>
-                    <span className="code">{m.params} · {m.size_gb}GB</span>
+                    <span className="code">{m.params}</span>
                     <span className={compat.cls}>{compat.label}</span>
                   </div>
                   <p className="text-xs text-gray-500 mt-1 leading-relaxed">{m.description}</p>
@@ -90,11 +128,46 @@ export default function ModelSelection() {
                       Ideal para: {m.best_for}
                     </p>
                   )}
+
+                  {/* Quant variants table */}
+                  <div className="mt-3 pt-3 border-t border-surface-200" onClick={e => e.stopPropagation()}>
+                    <p className="section-title mb-2">Variantes disponíveis</p>
+                    <div className="space-y-1">
+                      {m.quant_options.map((opt) => {
+                        const isVariantSelected = selectedQuant[m.id] === opt.type
+                        const compatCls         = QUANT_COMPAT[opt.compatibility] ?? 'badge-gray'
+                        return (
+                          <label
+                            key={opt.type}
+                            onClick={e => { e.stopPropagation(); selectVariant(m.id, opt.type) }}
+                            className={`flex items-center gap-2 p-2 rounded border cursor-pointer transition-colors text-xs
+                              ${isVariantSelected
+                                ? 'border-accent-400 bg-accent-50'
+                                : 'border-surface-200 hover:border-surface-300 bg-white'}`}
+                          >
+                            <input
+                              type="radio"
+                              name={`quant-${m.id}`}
+                              value={opt.type}
+                              checked={isVariantSelected}
+                              onChange={() => selectVariant(m.id, opt.type)}
+                              className="accent-accent-500"
+                            />
+                            <span className="font-mono font-medium text-gray-800 w-28 flex-shrink-0">{opt.label}</span>
+                            <span className="text-gray-500">{opt.vram_gb} GB VRAM</span>
+                            <span className={`ml-auto ${compatCls}`}>
+                              {opt.compatibility === 'high' ? 'OK' : opt.compatibility === 'medium' ? 'Limite' : 'Insuf.'}
+                            </span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
                 </div>
 
                 <button
                   onClick={e => { e.stopPropagation(); setExpanded(prev => prev === m.id ? null : m.id) }}
-                  className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+                  className="text-gray-400 hover:text-gray-600 flex-shrink-0 mt-0.5"
                 >
                   {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                 </button>
