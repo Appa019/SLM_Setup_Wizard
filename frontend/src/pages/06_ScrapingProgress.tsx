@@ -4,7 +4,7 @@ import { CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Link2 } from 'lucide-
 import { motion } from 'framer-motion'
 import Layout from '../components/Layout'
 import { useWizard } from '../context/WizardContext'
-import api from '../lib/api'
+import { SSE_BASE } from '../lib/api'
 
 interface ScrapeState {
   running: boolean; total: number; done: number; failed: number
@@ -34,8 +34,7 @@ export default function ScrapingProgress() {
 
   useEffect(() => {
     setCurrentStep(6)
-    const BASE = (api.defaults.baseURL ?? 'http://localhost:8000').replace(/\/$/, '')
-    const es = new EventSource(`${BASE}/api/scraping/status`)
+    const es = new EventSource(`${SSE_BASE}/api/scraping/status`)
     esRef.current = es
     es.onmessage = e => {
       const d: ScrapeState = JSON.parse(e.data)

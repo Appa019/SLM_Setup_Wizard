@@ -52,12 +52,15 @@ export default function Dashboard() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  const [fetchError, setFetchError] = useState('')
+
   async function fetchStatus() {
+    setFetchError('')
     api.get<ModelStatus>('/api/training/status').then(r => {
       setStatus(r.data)
       if (r.data.loaded_model) setSelected(r.data.loaded_model)
       else if (r.data.models.length > 0) setSelected(r.data.models[0].name)
-    }).catch(() => {})
+    }).catch(() => setFetchError('Erro ao carregar status do modelo.'))
   }
 
   async function handleLoad() {
@@ -131,6 +134,12 @@ export default function Dashboard() {
             <ArrowLeft size={13} /> Voltar
           </button>
         </div>
+
+        {fetchError && (
+          <div className="card border-red-200 bg-danger-50 text-danger-600 text-xs p-3">
+            {fetchError}
+          </div>
+        )}
 
         {/* llama.cpp status */}
         {status && !status.llama_available && (

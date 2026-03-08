@@ -23,10 +23,12 @@ export default function CostPanel() {
   const [open, setOpen]       = useState(false)
   const [data, setData]       = useState<CostEstimate | null>(null)
   const [history, setHistory] = useState<CostEntry[]>([])
+  const [error, setError]     = useState('')
 
   useEffect(() => {
     const load = () => {
-      api.get<CostEstimate>('/api/costs/estimate').then(r => setData(r.data)).catch(() => {})
+      setError('')
+      api.get<CostEstimate>('/api/costs/estimate').then(r => setData(r.data)).catch(() => setError('Erro ao carregar custos'))
       api.get<CostEntry[]>('/api/costs/history').then(r => setHistory(r.data)).catch(() => {})
     }
     load()
@@ -77,6 +79,9 @@ export default function CostPanel() {
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin">
+                {error && (
+                  <div className="text-xs text-danger-600 bg-danger-50 border border-red-200 rounded p-2">{error}</div>
+                )}
                 {/* Total */}
                 <div className="card-sm space-y-3">
                   <div className="flex justify-between items-center">

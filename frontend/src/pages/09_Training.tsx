@@ -4,7 +4,7 @@ import { CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Terminal } from 'luci
 import { motion, AnimatePresence } from 'framer-motion'
 import Layout from '../components/Layout'
 import { useWizard } from '../context/WizardContext'
-import api from '../lib/api'
+import { SSE_BASE } from '../lib/api'
 
 interface TState {
   running: boolean; step: string; steps_done: string[]
@@ -21,8 +21,7 @@ export default function Training() {
 
   useEffect(() => {
     setCurrentStep(9)
-    const BASE = (api.defaults.baseURL ?? 'http://localhost:8000').replace(/\/$/, '')
-    const es = new EventSource(`${BASE}/api/colab/status`)
+    const es = new EventSource(`${SSE_BASE}/api/colab/status`)
     esRef.current = es
     es.onmessage = e => {
       const d: TState = JSON.parse(e.data)

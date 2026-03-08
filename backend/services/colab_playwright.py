@@ -1,8 +1,8 @@
 import asyncio
 import subprocess
-import time
-import urllib.request
 from pathlib import Path
+
+import httpx
 
 training_state: dict = {
     "running": False,
@@ -85,13 +85,14 @@ def _launch_chrome(profile_dir: Path) -> subprocess.Popen:
     return proc
 
 
-def _wait_cdp(timeout_s: int = 20):
-    for _ in range(timeout_s * 2):
-        try:
-            urllib.request.urlopen(f"{_CDP_URL}/json", timeout=1)
-            return
-        except Exception:
-            time.sleep(0.5)
+async def _wait_cdp(timeout_s: int = 20):
+    async with httpx.AsyncClient() as client:
+        for _ in range(timeout_s * 2):
+            try:
+                await client.get(f"{_CDP_URL}/json", timeout=1)
+                return
+            except Exception:
+                await asyncio.sleep(0.5)
     raise RuntimeError("CDP nao respondeu — Chrome nao iniciou corretamente")
 
 
@@ -137,7 +138,7 @@ async def run_colab_automation(notebook_path: Path, dataset_path: Path, model_ou
         _log("Lancando Chrome com perfil persistente em .colab-profile/")
         _log("(Login sera salvo automaticamente apos a primeira vez)")
         proc = _launch_chrome(PROFILE_DIR)
-        _wait_cdp()
+        await _wait_cdp()
         _log("CDP pronto — conectando Playwright...")
 
         async with async_playwright() as p:

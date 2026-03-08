@@ -34,7 +34,7 @@ data/processed/
 models/
 
 # Colab generated
-colab/generated_notebook.ipynb
+colab/*.ipynb
 
 # Playwright
 playwright-report/

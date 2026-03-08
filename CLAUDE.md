@@ -50,6 +50,7 @@ timeout 6 uvicorn main:app --host 127.0.0.1 --port 8000
 | `colab_playwright.py` | Automacao completa do Colab: Chrome real (subprocess+CDP) com login persistente, upload, T4 GPU, run all, download .gguf |
 | `model_recommender.py` | Lista modelos com variantes de quantizacao (full/Q8/Q4_K_M) e VRAM necessaria |
 | `cost_tracker.py` | Registra cada chamada OpenAI em `data/costs.jsonl`; calcula custo em USD |
+| `query_generator.py` | Gera queries de busca otimizadas a partir do perfil de tema (GPT-4o-mini) |
 | `llama_cpp_runner.py` | Executa modelo GGUF localmente via llama.cpp |
 
 ### SSE (Server-Sent Events)

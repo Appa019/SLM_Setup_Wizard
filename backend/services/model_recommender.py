@@ -194,7 +194,8 @@ async def get_recommendations(hardware: dict) -> list[dict]:
             if recs:
                 return _enrich(recs, effective)
 
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("GPT-5.1 model recommendation failed, using fallbacks: %s", e)
 
     return _enrich(list(FALLBACK_MODELS), effective)

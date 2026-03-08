@@ -5,7 +5,7 @@ import { motion } from 'framer-motion'
 import Layout from '../components/Layout'
 import ChatMessage from '../components/ChatMessage'
 import { useWizard } from '../context/WizardContext'
-import api from '../lib/api'
+import api, { SSE_BASE } from '../lib/api'
 
 interface Msg { role: 'user' | 'assistant'; content: string }
 
@@ -45,14 +45,14 @@ export default function TopicChat() {
     const assistantIdx = history.length
 
     try {
-      const BASE = (api.defaults.baseURL ?? 'http://localhost:8000').replace(/\/$/, '')
-      const response = await fetch(`${BASE}/api/chat/message`, {
+      const response = await fetch(`${SSE_BASE}/api/chat/message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: history.map(m => ({ role: m.role, content: m.content })) }),
       })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
-      const reader  = response.body!.getReader()
+      if (!response.body) throw new Error('Response body is null')
+      const reader  = response.body.getReader()
       const decoder = new TextDecoder()
       let acc = ''
 

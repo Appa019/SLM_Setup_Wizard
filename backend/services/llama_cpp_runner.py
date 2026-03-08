@@ -59,6 +59,8 @@ async def load_model(model_name: str) -> dict:
     global _server_proc, _loaded_model
 
     model_path = MODELS_DIR / model_name
+    if not str(model_path.resolve()).startswith(str(MODELS_DIR.resolve())):
+        return {"ok": False, "error": "Nome de modelo invalido"}
     if not model_path.exists():
         return {"ok": False, "error": f"Modelo nao encontrado: {model_name}"}
 

@@ -4,7 +4,7 @@ import { CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Sparkles, Clock } fro
 import { motion, AnimatePresence } from 'framer-motion'
 import Layout from '../components/Layout'
 import { useWizard } from '../context/WizardContext'
-import api from '../lib/api'
+import api, { SSE_BASE } from '../lib/api'
 
 interface PPState {
   running: boolean; total_chunks: number; done: number; failed: number
@@ -33,8 +33,7 @@ export default function Preprocessing() {
     try {
       await api.post('/api/preprocessing/start', { topic_profile: state.topicProfile ?? {} })
       setStarted(true)
-      const BASE = (api.defaults.baseURL ?? 'http://localhost:8000').replace(/\/$/, '')
-      const es = new EventSource(`${BASE}/api/preprocessing/status`)
+      const es = new EventSource(`${SSE_BASE}/api/preprocessing/status`)
       esRef.current = es
       es.onmessage = e => {
         const d: PPState = JSON.parse(e.data)

@@ -43,6 +43,7 @@ export default function ScrapingConfig() {
   }
 
   async function start() {
+    if (saving) return
     setSaving(true)
     update({ scrapingConfig: { url_count: urlLevel, sources } })
     try {

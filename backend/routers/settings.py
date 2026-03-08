@@ -26,8 +26,10 @@ async def set_openai_key(body: OpenAIKeyRequest):
 
 @router.post("/google-email")
 async def set_google_email(body: GoogleEmailRequest):
+    import os
     from utils.storage import write_env
     write_env({"GOOGLE_EMAIL": body.email})
+    os.environ["GOOGLE_EMAIL"] = body.email
     return {"ok": True}
 
 

@@ -182,8 +182,9 @@ async def generate_hyperparams(
         if start >= 0 and end > start:
             return json.loads(output_text[start:end])
 
-    except Exception:
-        pass
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("GPT-5.1 hyperparams failed, using conservative defaults: %s", e)
 
     # Fallback conservador
     return _conservative_defaults(model_id, user_vram, dataset_pairs)
