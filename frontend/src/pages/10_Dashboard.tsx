@@ -147,7 +147,7 @@ export default function Dashboard() {
         <div className="card space-y-4">
           <div className="flex items-center gap-2 border-b border-surface-200 pb-3">
             <Cpu size={15} className="text-accent-500" />
-            <h2 className="font-semibold text-gray-900 text-sm">Controle do Modelo</h2>
+            <h2 className="font-display font-bold text-gray-900 text-[11px] uppercase tracking-[0.08em]">Controle do Modelo</h2>
             {running && (
               <span className="ml-auto badge-green flex items-center gap-1">
                 <motion.span
@@ -259,7 +259,7 @@ export default function Dashboard() {
             >
               <div className="flex items-center gap-2 border-b border-surface-200 pb-3">
                 <Terminal size={15} className="text-accent-500" />
-                <h2 className="font-semibold text-gray-900 text-sm">Testar Modelo</h2>
+                <h2 className="font-display font-bold text-gray-900 text-[11px] uppercase tracking-[0.08em]">Testar Modelo</h2>
                 <span className="code ml-auto">{status?.loaded_model}</span>
               </div>
 

@@ -127,14 +127,14 @@ export default function Preprocessing() {
                     <Sparkles size={11} /> Preview — ultimos pares
                   </div>
                   {ppState.examples.slice(-2).map((ex, i) => (
-                    <div key={i} className="bg-surface-50 border border-surface-200 rounded p-2.5 space-y-1.5 text-xs">
+                    <div key={i} className="terminal-box space-y-1.5">
                       <div>
-                        <span className="font-semibold text-accent-500">Instrucao: </span>
-                        <span className="text-gray-700">{ex.instruction}</span>
+                        <span className="text-teal-400 font-bold">INST: </span>
+                        <span className="text-green-300">{ex.instruction}</span>
                       </div>
                       <div>
-                        <span className="font-semibold text-gray-500">Resposta: </span>
-                        <span className="text-gray-500 line-clamp-2">{ex.output}</span>
+                        <span className="text-gray-500 font-bold">OUT:  </span>
+                        <span className="text-green-500/70 line-clamp-2">{ex.output}</span>
                       </div>
                     </div>
                   ))}

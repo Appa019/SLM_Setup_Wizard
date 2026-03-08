@@ -83,9 +83,9 @@ export default function Training() {
               { label: 'Loss',  value: ts.metrics.loss != null ? ts.metrics.loss.toFixed(4) : '—', color: 'text-gray-900' },
               { label: 'Steps', value: ts.metrics.step || '—', color: 'text-gray-900' },
             ].map(m => (
-              <div key={m.label} className="card-sm text-center py-3">
+              <div key={m.label} className="card-sm text-center py-3 border-t-2 border-t-accent-500">
                 <p className={`text-lg font-bold font-mono ${m.color}`}>{m.value}</p>
-                <p className="text-[11px] text-gray-400 mt-0.5">{m.label}</p>
+                <p className="data-label mt-0.5">{m.label}</p>
               </div>
             ))}
           </div>
@@ -97,9 +97,9 @@ export default function Training() {
             <div className="flex items-center gap-1.5 section-title mb-2">
               <Terminal size={11} /> Log ao vivo
             </div>
-            <div ref={logRef} className="h-44 overflow-y-auto bg-gray-950 rounded p-2.5 scrollbar-thin">
+            <div ref={logRef} className="terminal-box h-44 scrollbar-dark">
               {ts.log.map((line, i) => (
-                <p key={i} className="text-[11px] font-mono text-green-400 leading-5">{line}</p>
+                <p key={i}>{line}</p>
               ))}
             </div>
           </div>

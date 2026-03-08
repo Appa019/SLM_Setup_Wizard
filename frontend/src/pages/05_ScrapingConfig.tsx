@@ -78,7 +78,7 @@ export default function ScrapingConfig() {
 
         {/* Volume */}
         <div className="card space-y-4">
-          <h3 className="text-sm font-semibold text-gray-900 border-b border-surface-200 pb-2">
+          <h3 className="font-display text-[11px] font-bold text-gray-900 uppercase tracking-[0.08em] border-b border-surface-200 pb-2">
             Volume de dados
           </h3>
 
@@ -115,7 +115,7 @@ export default function ScrapingConfig() {
 
         {/* Sources */}
         <div className="card space-y-3">
-          <h3 className="text-sm font-semibold text-gray-900 border-b border-surface-200 pb-2">
+          <h3 className="font-display text-[11px] font-bold text-gray-900 uppercase tracking-[0.08em] border-b border-surface-200 pb-2">
             Tipos de fonte
           </h3>
           <div className="grid grid-cols-2 gap-2">

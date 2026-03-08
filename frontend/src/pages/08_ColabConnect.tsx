@@ -83,7 +83,7 @@ export default function ColabConnect() {
 
   const ParamRow = ({ label, value }: { label: string; value: string | number | boolean }) => (
     <div className="flex justify-between text-xs border-b border-surface-100 py-1">
-      <span className="text-gray-400">{label}</span>
+      <span className="data-label">{label}</span>
       <span className="font-mono text-gray-800">{String(value)}</span>
     </div>
   )
@@ -95,7 +95,7 @@ export default function ColabConnect() {
         {!started ? (
           <>
             <div className="card space-y-4">
-              <h3 className="text-sm font-semibold text-gray-900 border-b border-surface-200 pb-2">
+              <h3 className="font-display text-[11px] font-bold text-gray-900 uppercase tracking-[0.08em] border-b border-surface-200 pb-2">
                 O que vai acontecer
               </h3>
               {[
@@ -104,7 +104,7 @@ export default function ColabConnect() {
                 { icon: Upload,  title: 'Notebook/Script gerado',   desc: 'Um notebook Colab ou script Python e gerado automaticamente com a config da IA.' },
               ].map(item => (
                 <div key={item.title} className="flex gap-3">
-                  <div className="w-7 h-7 rounded border border-surface-200 bg-surface-50 flex items-center justify-center flex-shrink-0">
+                  <div className="w-7 h-7 border border-surface-200 bg-surface-50 flex items-center justify-center flex-shrink-0">
                     <item.icon size={14} className="text-accent-500" />
                   </div>
                   <div>

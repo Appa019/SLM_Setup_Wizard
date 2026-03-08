@@ -1,18 +1,17 @@
-import { Check } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useWizard } from '../context/WizardContext'
 
 const STEPS = [
-  { n: 1, label: 'Configuracoes',    path: '/settings' },
-  { n: 2, label: 'Hardware',         path: '/hardware' },
-  { n: 3, label: 'Modelo',           path: '/model' },
-  { n: 4, label: 'Tema',             path: '/topic' },
-  { n: 5, label: 'Config Scraping',  path: '/scraping/config' },
-  { n: 6, label: 'Scraping',         path: '/scraping/progress' },
-  { n: 7, label: 'Pre-processamento',path: '/preprocessing' },
-  { n: 8, label: 'Colab',            path: '/colab' },
-  { n: 9, label: 'Treinamento',      path: '/training' },
-  { n: 10, label: 'Dashboard',       path: '/dashboard' },
+  { n: 1, label: 'Configuracoes',    path: '/settings',           icon: '/01_icone.png' },
+  { n: 2, label: 'Hardware',         path: '/hardware',           icon: '/02_icone.png' },
+  { n: 3, label: 'Modelo',           path: '/model',              icon: '/03_icone.png' },
+  { n: 4, label: 'Tema',             path: '/topic',              icon: '/04_icone.png' },
+  { n: 5, label: 'Config Scraping',  path: '/scraping/config',    icon: '/05_icone.png' },
+  { n: 6, label: 'Scraping',         path: '/scraping/progress',  icon: '/06_icone.png' },
+  { n: 7, label: 'Pre-processamento',path: '/preprocessing',      icon: '/07_icone.png' },
+  { n: 8, label: 'Colab',            path: '/colab',              icon: '/08_icone.png' },
+  { n: 9, label: 'Treinamento',      path: '/training',           icon: '/09_icone.png' },
+  { n: 10, label: 'Dashboard',       path: '/dashboard',          icon: '/10_icone.png' },
 ]
 
 export default function Stepper() {
@@ -21,9 +20,6 @@ export default function Stepper() {
 
   return (
     <div className="px-2 py-1">
-      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider px-2 py-2">
-        Etapas
-      </p>
       {STEPS.map(step => {
         const done   = step.n < currentStep
         const active = step.n === currentStep
@@ -32,23 +28,21 @@ export default function Stepper() {
           <button
             key={step.n}
             onClick={() => navigate(step.path)}
-            className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-sm text-left transition-colors duration-100 cursor-pointer
+            className={`w-full flex items-center gap-2.5 px-2 py-1.5 text-left transition-colors duration-100 cursor-pointer
               ${active
-                ? 'bg-accent-50 text-accent-600'
+                ? 'bg-accent-50 border-l-2 border-l-accent-500 text-accent-700'
                 : done
-                  ? 'text-gray-500 hover:bg-surface-100'
-                  : 'text-gray-400 hover:bg-surface-100'
+                  ? 'text-gray-500 hover:bg-surface-100 border-l-2 border-l-transparent'
+                  : 'text-gray-400 hover:bg-surface-100 border-l-2 border-l-transparent'
               }`}
           >
-            {/* Step indicator */}
-            <span className={`flex-shrink-0 w-5 h-5 rounded-sm flex items-center justify-center text-[10px] font-bold border
-              ${active  ? 'bg-accent-500 border-accent-500 text-white' : ''}
-              ${done    ? 'bg-surface-200 border-surface-200 text-gray-500' : ''}
-              ${!active && !done ? 'border-surface-300 text-gray-400' : ''}
-            `}>
-              {done ? <Check size={10} strokeWidth={3} /> : step.n}
-            </span>
-            <span className={`text-xs truncate ${active ? 'font-semibold' : 'font-normal'}`}>
+            <img
+              src={step.icon}
+              className={`w-5 h-5 flex-shrink-0
+                ${active ? 'opacity-100' : done ? 'opacity-50' : 'opacity-25 grayscale'}`}
+              alt=""
+            />
+            <span className={`font-display text-[11px] tracking-wide truncate ${active ? 'font-bold' : 'font-normal'}`}>
               {step.label}
             </span>
           </button>

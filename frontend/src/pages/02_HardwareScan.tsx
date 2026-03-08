@@ -106,13 +106,13 @@ export default function HardwareScan() {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.06 }}
-                  className="card-sm space-y-2"
+                  className="card-sm space-y-2 border-l-2 border-l-accent-500"
                 >
                   <div className="flex items-center gap-1.5 text-gray-500 text-xs font-medium">
                     <item.icon size={13} className="text-accent-500" />
                     {item.label}
                   </div>
-                  <p className="text-sm font-semibold text-gray-900 truncate">{item.value}</p>
+                  <p className="text-sm font-semibold text-gray-900 truncate font-mono">{item.value}</p>
                   <p className="text-[11px] text-gray-400 leading-tight">{item.sub}</p>
                 </motion.div>
               ))}

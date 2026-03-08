@@ -100,13 +100,11 @@ export default function TopicChat() {
           {messages.map((msg, i) => <ChatMessage key={i} role={msg.role} content={msg.content} />)}
           {streaming && messages.at(-1)?.content === '' && (
             <div className="flex justify-start mb-2">
-              <div className="w-6 h-6 rounded-sm bg-accent-500 flex items-center justify-center mr-2 mt-0.5">
-                <span className="text-white font-bold text-[10px]">S</span>
-              </div>
-              <div className="bg-white border border-surface-200 rounded px-3 py-2 shadow-card">
+              <img src="/logo.png" className="w-6 h-6 mr-2 mt-0.5" alt="SLM" />
+              <div className="bg-white border border-surface-200 px-3 py-2 shadow-card">
                 <motion.div className="flex gap-1 items-center h-4">
                   {[0,1,2].map(i => (
-                    <motion.span key={i} className="w-1.5 h-1.5 bg-gray-400 rounded-sm"
+                    <motion.span key={i} className="w-1.5 h-1.5 bg-gray-400"
                       animate={{ opacity: [0.3,1,0.3] }}
                       transition={{ repeat: Infinity, duration: 1, delay: i*0.2 }} />
                   ))}

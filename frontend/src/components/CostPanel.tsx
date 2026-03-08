@@ -42,8 +42,8 @@ export default function CostPanel() {
       <button
         onClick={() => setOpen(v => !v)}
         className="fixed bottom-5 right-5 z-50 flex items-center gap-2 px-3 py-2
-                   bg-white border border-surface-300 rounded shadow-card-md
-                   text-xs font-semibold text-gray-700 hover:bg-surface-50 transition-colors"
+                   bg-white border border-surface-300 shadow-card-md
+                   text-[10px] font-bold uppercase tracking-wider text-gray-700 hover:bg-surface-50 transition-colors"
       >
         <DollarSign size={13} className="text-accent-500" />
         {fmt(total)}
@@ -116,7 +116,7 @@ export default function CostPanel() {
                 <div className="card-sm space-y-1.5">
                   <p className="section-title mb-2">Tabela de precos (2026)</p>
                   {[
-                    { model: 'gpt-5.4',      inp: '$7.50',  out: '$30.00' },
+                    { model: 'gpt-5.1',      inp: '$5.00',  out: '$20.00' },
                     { model: 'gpt-4o',       inp: '$2.50',  out: '$10.00' },
                     { model: 'gpt-4o-mini',  inp: '$0.15',  out: '$0.60'  },
                     { model: 'gpt-4.1',      inp: '$2.00',  out: '$8.00'  },

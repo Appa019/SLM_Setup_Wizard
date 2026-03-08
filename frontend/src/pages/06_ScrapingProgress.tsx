@@ -87,9 +87,9 @@ export default function ScrapingProgress() {
             { label: 'Falhas',    value: st?.failed ?? 0,                  color: 'text-danger-600' },
             { label: 'Volume',    value: fmtBytes(st?.bytes_collected ?? 0), color: 'text-accent-500' },
           ].map(item => (
-            <div key={item.label} className="card-sm text-center py-3">
+            <div key={item.label} className={`card-sm text-center py-3 border-t-2 ${item.color === 'text-success-600' ? 'border-t-green-500' : item.color === 'text-danger-600' ? 'border-t-red-500' : 'border-t-accent-500'}`}>
               <p className={`text-xl font-bold font-mono ${item.color}`}>{item.value}</p>
-              <p className="text-[11px] text-gray-400 mt-0.5">{item.label}</p>
+              <p className="data-label mt-0.5">{item.label}</p>
             </div>
           ))}
         </div>
@@ -100,11 +100,13 @@ export default function ScrapingProgress() {
             <div className="flex items-center gap-1.5 section-title mb-2">
               <Link2 size={11} /> URLs recentes
             </div>
-            {log.map((url, i) => (
-              <p key={i} className={`text-[11px] font-mono truncate ${i === 0 ? 'text-gray-700' : 'text-gray-400'}`}>
-                {url}
-              </p>
-            ))}
+            <div className="terminal-box max-h-40 scrollbar-dark">
+              {log.map((url, i) => (
+                <p key={i} className={`truncate ${i === 0 ? 'text-green-300' : 'text-green-500/60'}`}>
+                  {url}
+                </p>
+              ))}
+            </div>
           </div>
         )}
 

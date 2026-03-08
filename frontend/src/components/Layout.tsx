@@ -14,18 +14,17 @@ export default function Layout({ children, title, subtitle, actions }: LayoutPro
   return (
     <div className="min-h-screen flex bg-surface-50">
       {/* Sidebar */}
-      <aside className="w-52 flex-shrink-0 bg-white border-r border-surface-200 flex flex-col">
+      <aside className="w-56 flex-shrink-0 bg-white border-r border-surface-200 flex flex-col">
         {/* Logo */}
         <div className="h-12 flex items-center px-4 border-b border-surface-200 gap-2.5">
-          <div className="w-6 h-6 bg-accent-500 rounded-sm flex items-center justify-center">
-            <span className="text-white font-bold text-xs">S</span>
-          </div>
+          <img src="/logo.png" className="h-7 w-7" alt="SLM" />
           <div>
-            <p className="text-xs font-semibold text-gray-900 leading-tight">SLM Local</p>
+            <p className="font-display text-sm text-gray-900 tracking-wide leading-tight">SLM Local</p>
             <p className="text-[10px] text-gray-400">Fine-tuning wizard</p>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto scrollbar-thin py-2">
+        <div className="h-[1px] bg-accent-500/20 mx-4" />
+        <div className="flex-1 overflow-y-auto scrollbar-thin py-2 bg-dot-grid-light bg-dot-16">
           <Stepper />
         </div>
       </aside>
@@ -39,7 +38,7 @@ export default function Layout({ children, title, subtitle, actions }: LayoutPro
               key={title}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="text-sm font-semibold text-gray-900"
+              className="font-display text-[11px] font-bold text-gray-900 uppercase tracking-[0.08em]"
             >
               {title}
             </motion.h1>

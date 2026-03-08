@@ -107,7 +107,7 @@ export default function ModelSelection() {
               onClick={() => selectModel(m)}
               className={`card cursor-pointer transition-colors duration-100 border-2
                 ${isSelected
-                  ? 'border-accent-500 bg-accent-50'
+                  ? 'border-accent-500 bg-accent-50 shadow-[inset_3px_0_0_0_#3d63ae]'
                   : 'border-surface-200 hover:border-surface-300'}`}
             >
               <div className="flex items-start gap-3">

@@ -61,7 +61,7 @@ export default function Settings() {
         <div className="card space-y-4">
           <div className="flex items-center gap-2 border-b border-surface-200 pb-3">
             <Key size={15} className="text-accent-500" />
-            <h2 className="font-semibold text-gray-900 text-sm">OpenAI API Key</h2>
+            <h2 className="font-display font-bold text-gray-900 text-[11px] uppercase tracking-[0.08em]">OpenAI API Key</h2>
           </div>
 
           <div className="bg-surface-50 border border-surface-200 rounded p-3 space-y-1.5">
@@ -122,7 +122,7 @@ export default function Settings() {
         <div className="card space-y-4">
           <div className="flex items-center gap-2 border-b border-surface-200 pb-3">
             <Mail size={15} className="text-accent-500" />
-            <h2 className="font-semibold text-gray-900 text-sm">Conta Google</h2>
+            <h2 className="font-display font-bold text-gray-900 text-[11px] uppercase tracking-[0.08em]">Conta Google</h2>
           </div>
 
           <div className="bg-accent-50 border border-accent-100 rounded p-3 text-xs text-accent-700 space-y-1">
