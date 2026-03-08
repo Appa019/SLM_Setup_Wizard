@@ -14,48 +14,57 @@ from chrome_helper import launch_chrome, wait_cdp_ready, CDP_URL
 
 
 async def wait_for_login(page, timeout_s: int = 300) -> bool:
+    """
+    Logado = botao 'Fazer login' / 'Sign in' NAO existe na pagina.
+    O seletor correto: a[aria-label="Fazer login"] (PT) ou a[aria-label="Sign in"] (EN).
+    """
     print("\nVERIFICANDO STATUS DE LOGIN:")
     print("-" * 40)
 
-    for i in range(timeout_s // 3):   # poll a cada 3s
+    for i in range(timeout_s // 3):
         try:
-            url   = page.url
-            title = await page.title()
             elapsed = i * 3
 
-            # Imprime status a cada 15s ou quando mudar
-            if i % 5 == 0:
-                print(f"  [{elapsed:>4}s] URL:   {url[:80]}")
-                print(f"         titulo: {title[:60]}")
-
-            # NAO logado: redirecionou para Google login
+            # Aguardar pagina do Colab
+            url = page.url
             if "accounts.google.com" in url:
-                if i == 0:
-                    print("  → Nao logado. Faca login no Chrome que abriu...")
+                if i == 0 or i % 10 == 0:
+                    print(f"  [{elapsed:>4}s] Pagina de login do Google aberta — faca login no Chrome...")
                 await asyncio.sleep(3)
                 continue
 
-            # LOGADO: esta no Colab e o titulo indica a UI carregou
-            if "colab.research.google.com" in url:
-                colab_title = (
-                    "colaboratory" in title.lower()
-                    or "colab" in title.lower()
-                    or title == ""          # pagina inicial sem notebook
-                )
-                if colab_title and elapsed >= 3:
-                    # Confirma que nao foi redirecionado de volta ao login
-                    await asyncio.sleep(2)
-                    if "accounts.google.com" not in page.url:
-                        return True
+            if "colab.research.google.com" not in url:
+                await asyncio.sleep(3)
+                continue
+
+            # Chave: verificar AUSENCIA do botao "Fazer login"
+            sign_in_btn = await page.query_selector(
+                'a[aria-label="Fazer login"], '
+                'a[aria-label="Sign in"], '
+                'a[aria-label="Sign In"]'
+            )
+
+            if i % 5 == 0:
+                status = "NAO LOGADO" if sign_in_btn else "LOGADO"
+                print(f"  [{elapsed:>4}s] {status} (botao login: {'encontrado' if sign_in_btn else 'ausente'})")
+
+            if sign_in_btn:
+                if i == 0:
+                    print("  → Faca login no Chrome que abriu...")
+                await asyncio.sleep(3)
+                continue
+
+            # Nao tem botao de login = esta logado
+            return True
 
         except Exception as e:
             err = str(e)
             if "destroyed" in err or "navigation" in err.lower() or "Target" in err:
                 if i % 5 == 0:
-                    print(f"  [{i*3:>4}s] Pagina navegando (SPA), aguardando...")
+                    print(f"  [{i*3:>4}s] Pagina navegando (SPA)...")
                 await asyncio.sleep(1)
                 continue
-            print(f"  Erro inesperado: {e}")
+            print(f"  Erro: {e}")
 
         await asyncio.sleep(3)
 

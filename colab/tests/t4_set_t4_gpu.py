@@ -70,62 +70,27 @@ async def set_gpu(page) -> bool:
         opts  = await s.evaluate('el => Array.from(el.options).map(o => ({v:o.value, t:o.text}))')
         print(f"  select '{name}' = '{value}' opcoes={opts}")
 
-    # Selecionar GPU
-    print("\nSelecionando GPU...")
+    # Selecionar GPUs: T4 via page.click() (Playwright simula clique real de mouse)
+    print("\nSelecionando GPUs: T4...")
     gpu_set = False
-    for selector, value in [
-        ('select[name="acceleratorType"]', 'GPU'),
-        ('select[name="hardwareAccelerator"]', 'GPU'),
+    for sel in [
+        'text=GPUs: T4',
+        '[role="radio"]:has-text("T4")',
+        'mat-radio-button:has-text("T4")',
     ]:
         try:
-            await page.select_option(selector, value, timeout=5000)
-            print(f"  GPU selecionado via: {selector}")
+            await page.click(sel, timeout=4000)
+            print(f"  GPUs: T4 clicado via: '{sel}'")
             gpu_set = True
             break
         except Exception:
             continue
 
     if not gpu_set:
-        # Tentar via radio/click
-        for sel in [
-            '[value="GPU"]',
-            'text=GPU',
-            'mat-radio-button:has-text("GPU")',
-        ]:
-            try:
-                await page.click(sel, timeout=3000)
-                print(f"  GPU clicado via: {sel}")
-                gpu_set = True
-                break
-            except Exception:
-                continue
-
-    if not gpu_set:
-        print("FALHA: nao conseguiu selecionar GPU")
-        # Debug: listar todos os inputs/radios do dialog
-        inputs = await page.query_selector_all('input, [role="radio"], select')
-        print("Inputs no dialog:")
-        for inp in inputs:
-            t    = await inp.get_attribute('type') or '?'
-            v    = await inp.get_attribute('value') or '?'
-            lbl  = await inp.get_attribute('aria-label') or ''
-            name = await inp.get_attribute('name') or ''
-            print(f"  type={t} value={v} name={name} aria='{lbl}'")
+        print("FALHA: nao conseguiu selecionar GPUs: T4")
         return False
 
     await asyncio.sleep(1)
-
-    # Subtipo T4 (pode nao existir)
-    for selector, value in [
-        ('select[name="acceleratorSubType"]', 'T4'),
-        ('select[name="gpuType"]', 'T4'),
-    ]:
-        try:
-            await page.select_option(selector, value, timeout=3000)
-            print(f"  T4 selecionado via: {selector}")
-            break
-        except Exception:
-            pass
 
     # Salvar — botoes estao em shadow DOM (web components Material Design)
     # get_by_role encontra os 2 botoes do dialog: [0]=Cancelar [1]=Salvar
