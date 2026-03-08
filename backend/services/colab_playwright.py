@@ -1,5 +1,4 @@
 import asyncio
-import json
 from pathlib import Path
 
 training_state: dict = {
@@ -38,9 +37,11 @@ def _log(msg: str):
 
 async def run_colab_automation(notebook_path: Path, dataset_path: Path, model_out_dir: Path):
     """
-    Automates Google Colab via Playwright (visible browser).
-    The browser stays visible so the user can monitor and intervene.
+    Abre o Google Colab no browser padrao do sistema e monitora a pasta models/
+    aguardando o arquivo .gguf gerado pelo treinamento.
     """
+    import webbrowser
+
     global training_state
     training_state.update({
         "running": True, "step": STEPS[0], "steps_done": [], "log": [],
@@ -49,114 +50,48 @@ async def run_colab_automation(notebook_path: Path, dataset_path: Path, model_ou
     })
 
     try:
-        from playwright.async_api import async_playwright
+        # Passo 1: Abrir Colab no browser real do usuario
+        _update_step(STEPS[0])
+        colab_url = "https://colab.research.google.com"
+        _log(f"Abrindo {colab_url} no browser padrao...")
+        webbrowser.open(colab_url)
+        await asyncio.sleep(3)
 
-        async with async_playwright() as p:
-            _log("Iniciando browser Chromium...")
-            browser = await p.chromium.launch(
-                headless=False,
-                args=["--start-maximized"],
-            )
-            context = await browser.new_context(
-                viewport={"width": 1280, "height": 900},
-                accept_downloads=True,
-            )
-            page = await context.new_page()
+        # Passo 2: Instruções para o usuario
+        _update_step("Aguardando acoes manuais no Colab...")
+        _log("=" * 42)
+        _log("ACOES NECESSARIAS NO BROWSER:")
+        _log("1. Faca login na conta Google se solicitado")
+        _log("2. File > Upload notebook")
+        _log(f"   Arquivo: {notebook_path.name}")
+        _log("3. Runtime > Change runtime type > T4 GPU")
+        _log("4. Runtime > Run all  (Ctrl+F9)")
+        _log("5. Na celula de upload: selecione training_data.jsonl")
+        _log(f"6. Aguarde o fim e faca download do modelo_final.gguf")
+        _log(f"   Salve em: {model_out_dir}/")
+        _log("=" * 42)
 
-            # Step 1: Open Colab
-            _update_step(STEPS[0])
-            _log("Abrindo colab.research.google.com...")
-            await page.goto("https://colab.research.google.com", timeout=30000)
-            await page.wait_for_load_state("networkidle", timeout=15000)
+        # Passo 3: Monitorar models/ aguardando .gguf
+        _update_step("Monitorando pasta models/ aguardando modelo_final.gguf...")
+        model_out_dir.mkdir(parents=True, exist_ok=True)
 
-            # Step 2: Check login
-            _update_step(STEPS[1])
-            _log("Verificando se usuario esta logado...")
-            await asyncio.sleep(3)
+        for i in range(360):  # ate 60 minutos (360 x 10s)
+            await asyncio.sleep(10)
+            elapsed = (i + 1) * 10
+            _log(f"Aguardando .gguf... {elapsed}s decorridos")
+            training_state["metrics"]["step"] = elapsed
 
-            # Check if logged in by looking for sign-in button
-            sign_in = await page.query_selector('a[href*="accounts.google.com"]')
-            if sign_in:
-                _log("Usuario nao esta logado. Aguardando login manual (60s)...")
-                training_state["step"] = "Aguardando login manual no browser..."
-                await asyncio.sleep(60)
+            gguf_files = list(model_out_dir.glob("*.gguf"))
+            if gguf_files:
+                model_path = str(gguf_files[0])
+                _log(f"Modelo GGUF detectado: {gguf_files[0].name}")
+                training_state["model_path"] = model_path
+                _update_step("Modelo recebido com sucesso!")
+                break
+        else:
+            _log("Timeout de 60 minutos atingido sem detectar .gguf.")
+            _log("Se o modelo ja foi baixado, coloque o .gguf em models/ e reinicie o dashboard.")
 
-            # Step 3: Upload notebook
-            _update_step(STEPS[2])
-            _log(f"Fazendo upload do notebook: {notebook_path.name}")
-
-            # Click "File > Upload notebook"
-            try:
-                await page.keyboard.press("Escape")
-                await asyncio.sleep(1)
-
-                # Use file input for upload
-                file_input = await page.query_selector('input[type="file"]')
-                if not file_input:
-                    # Try opening via URL
-                    await page.goto(
-                        f"https://colab.research.google.com/drive/",
-                        timeout=15000
-                    )
-                    await asyncio.sleep(2)
-
-                # Navigate to upload URL directly
-                await page.goto("https://colab.research.google.com/#create=true", timeout=15000)
-                await asyncio.sleep(3)
-
-                _log("Notebook aberto no Colab")
-            except Exception as e:
-                _log(f"Aviso ao navegar: {e}")
-
-            # Step 4: Select GPU runtime
-            _update_step(STEPS[3])
-            _log("Configurando runtime GPU T4...")
-            try:
-                # Runtime > Change runtime type
-                await page.click("text=Runtime", timeout=5000)
-                await asyncio.sleep(0.5)
-                await page.click("text=Change runtime type", timeout=5000)
-                await asyncio.sleep(1)
-                # Select T4 GPU
-                gpu_option = await page.query_selector('text=T4 GPU')
-                if gpu_option:
-                    await gpu_option.click()
-                await page.keyboard.press("Enter")
-                await asyncio.sleep(2)
-                _log("Runtime GPU configurado")
-            except Exception as e:
-                _log(f"Aviso ao configurar runtime: {e}. Continue manualmente se necessario.")
-
-            # Notify user about manual steps
-            _log("=" * 40)
-            _log("ACAO NECESSARIA: No browser aberto:")
-            _log("1. Faca upload do notebook gerado (colab/generated_notebook.ipynb)")
-            _log("2. Execute as celulas sequencialmente (Ctrl+F9 para executar tudo)")
-            _log("3. Na celula de upload, faca upload do training_data.jsonl")
-            _log("4. Aguarde o treinamento concluir e faca download do modelo_final.gguf")
-            _log("=" * 40)
-
-            # Step 5: Monitor (wait for user to run cells)
-            _update_step(STEPS[4])
-
-            # Simulate monitoring while browser stays open
-            for i in range(180):  # Wait up to 30 minutes
-                await asyncio.sleep(10)
-                _log(f"Aguardando execucao... {(i+1)*10}s")
-                training_state["metrics"]["step"] = (i + 1) * 10
-
-                # Check if model file was downloaded
-                gguf_files = list(model_out_dir.glob("*.gguf"))
-                if gguf_files:
-                    _log(f"Modelo GGUF detectado: {gguf_files[0].name}")
-                    training_state["model_path"] = str(gguf_files[0])
-                    break
-
-            await browser.close()
-
-    except ImportError:
-        training_state["error"] = "Playwright nao instalado. Execute: playwright install chromium"
-        _log(training_state["error"])
     except Exception as e:
         training_state["error"] = str(e)
         _log(f"Erro: {e}")
