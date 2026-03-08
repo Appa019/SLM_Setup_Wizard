@@ -9,6 +9,7 @@ from urllib.parse import parse_qs, quote_plus, unquote, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
+from services.query_generator import generate_queries
 
 DATA_DIR = Path(__file__).parent.parent.parent / "data" / "raw"
 
@@ -84,7 +85,7 @@ def _random_headers(referer: str = "") -> dict:
         "User-Agent":                ua,
         "Accept":                    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
         "Accept-Language":           "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-        "Accept-Encoding":           "gzip, deflate, br",
+        "Accept-Encoding":           "gzip, deflate",
         "DNT":                       "1",
         "Connection":                "keep-alive",
         "Upgrade-Insecure-Requests": "1",
@@ -215,8 +216,11 @@ async def run_scraping(topic_profile: dict, url_count: int):
     })
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    keywords: list[str] = topic_profile.get("keywords", []) + [topic_profile.get("area", "")]
-    keywords = [k for k in keywords if k]
+    raw_keywords: list[str] = topic_profile.get("keywords", []) + [topic_profile.get("area", "")]
+    raw_keywords = [k for k in raw_keywords if k]
+    keywords = await generate_queries(topic_profile)
+    if not keywords:
+        keywords = raw_keywords
     results:  list[dict] = []
     limiter   = DomainRateLimiter(max_per_minute=3)
     cookies   = httpx.Cookies()
@@ -226,7 +230,7 @@ async def run_scraping(topic_profile: dict, url_count: int):
         all_links: list[str] = []
         used_engine_idx = 0
 
-        for kw in keywords[:8]:
+        for kw in keywords:
             engine     = SEARCH_ENGINES[used_engine_idx % len(SEARCH_ENGINES)]
             search_url = engine(kw)
             used_engine_idx += 1
