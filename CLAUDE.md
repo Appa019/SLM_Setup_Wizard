@@ -46,8 +46,8 @@ timeout 6 uvicorn main:app --host 127.0.0.1 --port 8000
 | `scraper.py` | Scraping assincrono; `scraping_state` dict em memoria; SSE via `/api/scraping/status` |
 | `preprocessor.py` | Gera pares instrucao/resposta (JSONL) usando GPT-4o-mini; SSE via `/api/preprocessing/status` |
 | `hyperparams.py` | GPT-5.1 Responses API com prompt "Dr. Alex Chen"; retorna hiperparametros otimos de LoRA |
-| `colab_manager.py` | Gera `colab/generated_notebook.ipynb` ou `colab/local_training.py` |
-| `colab_playwright.py` | Automacao completa do Colab: Chrome real (subprocess+CDP) com login persistente, upload, T4 GPU, run all, download .gguf |
+| `colab_manager.py` | Gera `colab/generated_notebook.ipynb` (12 cells) ou `colab/local_training.py`. Usa `SFTConfig` + `processing_class` (TRL v0.29+). GGUF conversion em dois passos: f16 + `llama-quantize`. |
+| `colab_playwright.py` | Automacao 100% autonoma do Colab: Chrome headless (apos 1o login), upload notebook, T4 GPU, run all, auto-inject dataset, download .gguf |
 | `model_recommender.py` | Lista modelos com variantes de quantizacao (full/Q8/Q4_K_M) e VRAM necessaria |
 | `cost_tracker.py` | Registra cada chamada OpenAI em `data/costs.jsonl`; calcula custo em USD |
 | `query_generator.py` | Gera queries de busca otimizadas a partir do perfil de tema (GPT-4o-mini) |
@@ -69,11 +69,16 @@ GPT-5.1 otimiza `lora_r`, `batch_size`, etc., mas o router SEMPRE sobrescreve `t
 
 ### Automacao Colab (Chrome + CDP)
 Chrome real lancado via `subprocess.Popen()` SEM flags de automacao (`--enable-automation` bloquearia login Google). Playwright conecta via `p.chromium.connect_over_cdp("http://localhost:9222")`.
+- **Headless automatico**: primeira execucao abre Chrome com tela (login manual). Execucoes seguintes usam `--headless=new` (cookies reutilizados de `.colab-profile/`). Se cookies expirarem, marker `.login-expired` forca headed na proxima vez.
 - **Perfil persistente**: `.colab-profile/` salva cookies/login entre sessoes (adicionado ao `.gitignore`)
+- **Auto-inject dataset**: `_inject_dataset()` detecta o widget `files.upload()` do Colab (input[type="file"] dentro de output-area) e injeta `training_data.jsonl` via `set_input_files()`. Polling ate 5 min para o widget aparecer.
 - **UI PT-BR**: seletores usam texto em portugues — `Arquivo`, `Fazer upload de notebook`, `Ambiente de execucao`, `Alterar tipo de ambiente de execucao`
 - **Shadow DOM**: botoes Material Design 3 (ex: salvar GPU) precisam de `get_by_role("button").all()`, nao `button:has-text()`
 - **Radio buttons**: DEVE usar `page.click()` (mouse real), nao `page.evaluate(el.click())` — radio nao dispara change event com click programatico
-- **Download .gguf**: configurado via `Browser.setDownloadBehavior` (CDP session), NAO chamar `download.save_as()` (Chrome real nao suporta)
+- **Download .gguf**: `Page.setDownloadBehavior` (CDP session) com fallback `Browser.setDownloadBehavior`. Dupla deteccao: `page.on("download")` + polling direto do diretorio `models/` para `.gguf`. NAO chamar `download.save_as()` (Chrome real nao suporta).
+- **Login detection**: minimo 2 checks consecutivos sem botao "Fazer login" para confirmar (evita false positive durante carregamento)
+- **Race condition SSE**: `reset_training_state()` chamado no router ANTES da `BackgroundTasks` — evita SSE receber estado stale do run anterior
+- **Chrome cleanup**: `proc.wait(timeout=10)` com fallback `proc.kill()` no finally (evita zombie)
 - **Testes manuais**: `colab/tests/t1_connect.py` a `t5_download.py` — scripts standalone, rodar individualmente
 
 ### Frontend
@@ -124,6 +129,14 @@ from services import cost_tracker
 cost_tracker.record(model, phase, tokens_in, tokens_out)
 ```
 Fases validas: `"recommendation"`, `"model_recommendation"`, `"chat"`, `"preprocessing"`, `"hyperparams"`, `"other"`.
+
+### Notebook/Script de treinamento (colab_manager.py)
+- **SFTTrainer**: usar `SFTConfig` (nao `TrainingArguments`), `processing_class=tokenizer` (nao `tokenizer=`), sem `dataset_text_field` (auto-detecta coluna `text`)
+- **LoRA**: NAO usar `get_peft_model()` — passar `peft_config=lora_config` ao `SFTTrainer` (ele faz o wrapping). `print_trainable_parameters()` via `trainer.model`
+- **GGUF**: converter para f16 primeiro (`convert_hf_to_gguf.py --outtype f16`), depois quantizar com `llama-quantize` se tipo nao for direto (`f16`, `f32`, `bf16`, `q8_0`)
+- **Local script**: DEVE incluir merge (`PeftModel.from_pretrained` + `merge_and_unload`) antes da conversao GGUF — `convert_hf_to_gguf.py` precisa de modelo completo, nao adapter
+- **nbformat**: cells precisam de campo `id` (uuid), `source` como lista de strings (`_split_source()`)
+- **Deps**: `trl>=0.29.0`, `transformers>=4.47.0`, `peft>=0.14.0`
 
 ### TypeScript / React
 - `verbatimModuleSyntax: true` — usar `import type` para tipos (ex: `import type { ReactNode } from 'react'`)
