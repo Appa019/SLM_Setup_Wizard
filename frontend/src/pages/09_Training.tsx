@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CheckCircle2, AlertCircle, ArrowRight, Terminal } from 'lucide-react'
+import { CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Terminal } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Layout from '../components/Layout'
 import { useWizard } from '../context/WizardContext'
+import api from '../lib/api'
 
 interface TState {
   running: boolean; step: string; steps_done: string[]
@@ -20,7 +21,8 @@ export default function Training() {
 
   useEffect(() => {
     setCurrentStep(9)
-    const es = new EventSource('http://localhost:8000/api/colab/status')
+    const BASE = (api.defaults.baseURL ?? 'http://localhost:8000').replace(/\/$/, '')
+    const es = new EventSource(`${BASE}/api/colab/status`)
     esRef.current = es
     es.onmessage = e => {
       const d: TState = JSON.parse(e.data)
@@ -138,7 +140,10 @@ export default function Training() {
           </div>
         )}
 
-        <div className="flex justify-end">
+        <div className="flex justify-between items-center">
+          <button onClick={() => navigate('/colab')} className="btn-secondary text-xs">
+            <ArrowLeft size={13} /> Voltar
+          </button>
           <button onClick={() => navigate('/dashboard')} className="btn-secondary text-xs">
             Ir para Dashboard (modelo manual)
           </button>

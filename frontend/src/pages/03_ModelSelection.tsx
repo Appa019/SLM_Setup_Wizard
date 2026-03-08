@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Check, ArrowRight, ExternalLink } from 'lucide-react'
+import { Check, ArrowRight, ArrowLeft, ExternalLink } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Layout from '../components/Layout'
 import Loader from '../components/Loader'
@@ -89,9 +89,9 @@ export default function ModelSelection() {
   }
 
   return (
-    <Layout title="Selecionar Modelo" subtitle="Modelos escolhidos pelo GPT-5.4 para o seu hardware">
+    <Layout title="Selecionar Modelo" subtitle="Modelos escolhidos pelo GPT-5.1 para o seu hardware">
       <div className="max-w-xl space-y-3">
-        {loading && <Loader message="GPT-5.4 analisando seu hardware..." />}
+        {loading && <Loader message="GPT-5.1 analisando seu hardware..." />}
         {error   && <div className="card border-red-200 bg-danger-50 text-danger-600 text-xs p-3">{error}</div>}
 
         {models.map((m, i) => {
@@ -227,7 +227,10 @@ export default function ModelSelection() {
         })}
 
         {models.length > 0 && (
-          <div className="flex justify-end pt-1">
+          <div className="flex justify-between items-center pt-1">
+            <button onClick={() => navigate('/hardware')} className="btn-secondary">
+              <ArrowLeft size={14} /> Voltar
+            </button>
             <button onClick={() => navigate('/topic')} disabled={!selected} className="btn-primary">
               Definir Tema <ArrowRight size={14} />
             </button>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Cpu, FolderOpen, Play, Square, Send, RefreshCw, CheckCircle2, AlertCircle, Terminal, Plus } from 'lucide-react'
+import { Cpu, FolderOpen, Play, Square, Send, RefreshCw, CheckCircle2, AlertCircle, Terminal, Plus, ArrowLeft } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Layout from '../components/Layout'
 import ChatMessage from '../components/ChatMessage'
@@ -125,6 +125,12 @@ export default function Dashboard() {
       }
     >
       <div className="max-w-2xl space-y-4">
+
+        <div className="flex justify-start">
+          <button onClick={() => navigate('/training')} className="btn-secondary text-xs">
+            <ArrowLeft size={13} /> Voltar
+          </button>
+        </div>
 
         {/* llama.cpp status */}
         {status && !status.llama_available && (

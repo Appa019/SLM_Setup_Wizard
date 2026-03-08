@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Send, ArrowRight, CheckCircle2 } from 'lucide-react'
+import { Send, ArrowRight, ArrowLeft, CheckCircle2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Layout from '../components/Layout'
 import ChatMessage from '../components/ChatMessage'
@@ -45,11 +45,13 @@ export default function TopicChat() {
     const assistantIdx = history.length
 
     try {
-      const response = await fetch('http://localhost:8000/api/chat/message', {
+      const BASE = (api.defaults.baseURL ?? 'http://localhost:8000').replace(/\/$/, '')
+      const response = await fetch(`${BASE}/api/chat/message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: history.map(m => ({ role: m.role, content: m.content })) }),
       })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const reader  = response.body!.getReader()
       const decoder = new TextDecoder()
       let acc = ''
@@ -117,6 +119,11 @@ export default function TopicChat() {
 
         {/* Input */}
         <div className="border-t border-surface-200 pt-3 space-y-2">
+          <div className="flex justify-start mb-1">
+            <button onClick={() => navigate('/model')} className="btn-secondary text-xs">
+              <ArrowLeft size={13} /> Voltar
+            </button>
+          </div>
           {finalized ? (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
               className="flex items-center justify-between bg-success-50 border border-green-200 rounded p-3">

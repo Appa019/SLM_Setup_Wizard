@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Monitor, Upload, Cpu, Play, ArrowRight, CheckCircle2, Info, Terminal, Laptop } from 'lucide-react'
+import { Monitor, Upload, Cpu, Play, ArrowRight, ArrowLeft, CheckCircle2, Info, Terminal, Laptop } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Layout from '../components/Layout'
 import { useWizard } from '../context/WizardContext'
@@ -89,7 +89,7 @@ export default function ColabConnect() {
   )
 
   return (
-    <Layout title="Treinamento" subtitle="Hiperparametros gerados por GPT-5.4 — Dr. Alex Chen">
+    <Layout title="Treinamento" subtitle="Hiperparametros gerados por GPT-5.1 — Dr. Alex Chen">
       <div className="max-w-xl space-y-4">
 
         {!started ? (
@@ -99,7 +99,7 @@ export default function ColabConnect() {
                 O que vai acontecer
               </h3>
               {[
-                { icon: Cpu,     title: 'Hiperparametros por IA',   desc: 'GPT-5.4 vai calcular todos os parametros de treinamento com base no seu hardware exato.' },
+                { icon: Cpu,     title: 'Hiperparametros por IA',   desc: 'GPT-5.1 vai calcular todos os parametros de treinamento com base no seu hardware exato.' },
                 { icon: Monitor, title: 'GPU local ou Colab T4',    desc: 'Se sua GPU superar o T4 (15GB VRAM), o treinamento e feito na sua maquina. Caso contrario, vai pro Colab.' },
                 { icon: Upload,  title: 'Notebook/Script gerado',   desc: 'Um notebook Colab ou script Python e gerado automaticamente com a config da IA.' },
               ].map(item => (
@@ -124,9 +124,12 @@ export default function ColabConnect() {
               </div>
             </div>
 
-            <div className="flex justify-end">
+            <div className="flex justify-between items-center">
+              <button onClick={() => navigate('/preprocessing')} className="btn-secondary">
+                <ArrowLeft size={14} /> Voltar
+              </button>
               <button onClick={start} disabled={starting} className="btn-primary">
-                {starting ? 'Consultando GPT-5.4...' : 'Gerar Hiperparametros e Iniciar'}
+                {starting ? 'Consultando GPT-5.1...' : 'Gerar Hiperparametros e Iniciar'}
                 <ArrowRight size={14} />
               </button>
             </div>
@@ -151,7 +154,7 @@ export default function ColabConnect() {
               <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
                 className="card-sm space-y-1">
                 <div className="flex items-center gap-1.5 section-title mb-3">
-                  <Terminal size={11} /> Configuracao gerada pelo GPT-5.4
+                  <Terminal size={11} /> Configuracao gerada pelo GPT-5.1
                 </div>
                 <ParamRow label="Quantizacao"         value={params.quantization} />
                 <ParamRow label="LoRA r"              value={params.lora_r} />

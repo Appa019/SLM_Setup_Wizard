@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CheckCircle2, AlertCircle, ArrowRight, Sparkles, Clock } from 'lucide-react'
+import { CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Sparkles, Clock } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Layout from '../components/Layout'
 import { useWizard } from '../context/WizardContext'
@@ -33,7 +33,8 @@ export default function Preprocessing() {
     try {
       await api.post('/api/preprocessing/start', { topic_profile: state.topicProfile ?? {} })
       setStarted(true)
-      const es = new EventSource('http://localhost:8000/api/preprocessing/status')
+      const BASE = (api.defaults.baseURL ?? 'http://localhost:8000').replace(/\/$/, '')
+      const es = new EventSource(`${BASE}/api/preprocessing/status`)
       esRef.current = es
       es.onmessage = e => {
         const d: PPState = JSON.parse(e.data)
@@ -82,7 +83,10 @@ export default function Preprocessing() {
                 </div>
               ))}
             </div>
-            <div className="flex justify-end border-t border-surface-200 pt-3">
+            <div className="flex justify-between items-center border-t border-surface-200 pt-3">
+              <button onClick={() => navigate('/scraping/progress')} className="btn-secondary">
+                <ArrowLeft size={14} /> Voltar
+              </button>
               <button onClick={start} disabled={starting || scrapingDone === false} className="btn-primary disabled:opacity-40 disabled:cursor-not-allowed">
                 {starting ? 'Iniciando...' : 'Iniciar Pre-processamento'}
               </button>

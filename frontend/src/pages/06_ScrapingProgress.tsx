@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CheckCircle2, AlertCircle, ArrowRight, Link2 } from 'lucide-react'
+import { CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Link2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Layout from '../components/Layout'
 import { useWizard } from '../context/WizardContext'
+import api from '../lib/api'
 
 interface ScrapeState {
   running: boolean; total: number; done: number; failed: number
@@ -33,7 +34,8 @@ export default function ScrapingProgress() {
 
   useEffect(() => {
     setCurrentStep(6)
-    const es = new EventSource('http://localhost:8000/api/scraping/status')
+    const BASE = (api.defaults.baseURL ?? 'http://localhost:8000').replace(/\/$/, '')
+    const es = new EventSource(`${BASE}/api/scraping/status`)
     esRef.current = es
     es.onmessage = e => {
       const d: ScrapeState = JSON.parse(e.data)
@@ -50,6 +52,12 @@ export default function ScrapingProgress() {
   return (
     <Layout title="Progresso do Scraping" subtitle="Coletando dados da web em tempo real">
       <div className="max-w-xl space-y-4">
+
+        <div className="flex justify-start">
+          <button onClick={() => navigate('/scraping/config')} className="btn-secondary text-xs">
+            <ArrowLeft size={13} /> Voltar
+          </button>
+        </div>
 
         {/* Progress bar */}
         <div className="card space-y-3">

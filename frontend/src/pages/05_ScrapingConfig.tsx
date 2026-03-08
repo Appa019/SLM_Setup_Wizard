@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Globe, FileText, BookOpen, MessageSquare, ArrowRight, Tag } from 'lucide-react'
+import { Globe, FileText, BookOpen, MessageSquare, ArrowRight, ArrowLeft, Tag } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Layout from '../components/Layout'
 import { useWizard } from '../context/WizardContext'
@@ -143,7 +143,10 @@ export default function ScrapingConfig() {
           </div>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex justify-between items-center">
+          <button onClick={() => navigate('/topic')} className="btn-secondary">
+            <ArrowLeft size={14} /> Voltar
+          </button>
           <button onClick={start} disabled={sources.length === 0 || saving} className="btn-primary">
             {saving ? 'Iniciando...' : `Iniciar scraping — ${urlLevel.toLocaleString()} URLs`}
             <ArrowRight size={14} />

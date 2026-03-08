@@ -31,13 +31,13 @@ export default function Stepper() {
         return (
           <button
             key={step.n}
-            onClick={() => done && navigate(step.path)}
-            className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-sm text-left transition-colors duration-100
+            onClick={() => navigate(step.path)}
+            className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-sm text-left transition-colors duration-100 cursor-pointer
               ${active
                 ? 'bg-accent-50 text-accent-600'
                 : done
-                  ? 'text-gray-500 hover:bg-surface-100 cursor-pointer'
-                  : 'text-gray-400 cursor-default'
+                  ? 'text-gray-500 hover:bg-surface-100'
+                  : 'text-gray-400 hover:bg-surface-100'
               }`}
           >
             {/* Step indicator */}
