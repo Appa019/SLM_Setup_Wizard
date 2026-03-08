@@ -39,3 +39,4 @@ colab/generated_notebook.ipynb
 # Playwright
 playwright-report/
 test-results/
+.colab-profile/
