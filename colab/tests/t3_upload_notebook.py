@@ -1,7 +1,11 @@
 """
-T3: Faz upload de um notebook .ipynb no Colab via File > Upload notebook.
-Usa Chrome real via subprocess + CDP (sem deteccao de automacao).
-Esperado: notebook abre no editor Colab.
+T3: Faz upload de um notebook .ipynb no Colab.
+Fluxo:
+  1. Abrir Colab
+  2. ESC para fechar qualquer dialog de boas-vindas
+  3. Arquivo > Fazer upload de notebook > injetar arquivo
+
+UI em portugues: menu = 'Arquivo', item = 'Fazer upload de notebook'
 
 PRE-REQUISITO: T2 passou (login salvo em .colab-profile/).
 """
@@ -13,8 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from chrome_helper import launch_chrome, wait_cdp_ready, CDP_URL
 
-# Notebook minimo de teste
-NOTEBOOK  = Path("/tmp/test_notebook.ipynb")
+NOTEBOOK = Path("/tmp/test_notebook.ipynb")
 NOTEBOOK.write_text(json.dumps({
     "cells": [{
         "cell_type": "code",
@@ -24,81 +27,99 @@ NOTEBOOK.write_text(json.dumps({
     "metadata": {"kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"}},
     "nbformat": 4, "nbformat_minor": 4
 }))
-print(f"Notebook de teste criado: {NOTEBOOK}")
+print(f"Notebook criado: {NOTEBOOK}")
 
 
 async def upload_notebook(page, notebook_path: Path) -> bool:
-    print("Clicando no menu File...")
-    for selector in [
-        'colab-toolbar-button:has-text("File")',
-        '[id*="file"]',
-        'text=File',
-    ]:
+    # ESC para fechar qualquer overlay/dialog inicial
+    print("Pressionando ESC para fechar dialog inicial...")
+    await page.keyboard.press("Escape")
+    await asyncio.sleep(1)
+
+    # Aguardar o menu Arquivo estar disponivel
+    print("Aguardando menu Arquivo...")
+    for attempt in range(5):
+        try:
+            await page.wait_for_selector(
+                'text=Arquivo, text=File',
+                timeout=5000
+            )
+            break
+        except Exception:
+            print(f"  tentativa {attempt+1}/5 — aguardando editor...")
+            await asyncio.sleep(2)
+
+    print("Clicando em Arquivo (File)...")
+    clicked_file = False
+    for selector in ['text=Arquivo', 'text=File']:
         try:
             await page.click(selector, timeout=5000)
-            print(f"  File clicado via: {selector}")
+            print(f"  Arquivo clicado via: '{selector}'")
+            clicked_file = True
             break
         except Exception:
             continue
-    else:
-        print("FALHA: nao encontrou menu File")
-        buttons = await page.query_selector_all('colab-toolbar-button, [role="menuitem"], button')
-        print("Botoes encontrados:")
-        for b in buttons[:15]:
-            t = await b.inner_text()
-            if t.strip():
-                print(f"  '{t.strip()}'")
+
+    if not clicked_file:
+        print("FALHA: menu Arquivo nao encontrado")
+        # Debug: listar textos curtos visiveis
+        all_els = await page.query_selector_all('button, [role="menuitem"], [role="button"]')
+        print(f"Elementos clicaveis ({len(all_els)}):")
+        seen = set()
+        for el in all_els[:40]:
+            try:
+                t = (await el.inner_text()).strip().split('\n')[0]
+                if t and t not in seen:
+                    seen.add(t)
+                    print(f"  '{t}'")
+            except Exception:
+                pass
         return False
 
     await asyncio.sleep(1)
 
-    print("Clicando em Upload notebook...")
+    print("Clicando em 'Fazer upload de notebook'...")
+    clicked_upload = False
     for selector in [
+        'text=Fazer upload de notebook',
         'text=Upload notebook',
         '[data-command="file_upload_notebook"]',
     ]:
         try:
-            await page.click(selector, timeout=3000)
-            print(f"  Upload notebook clicado via: {selector}")
+            await page.click(selector, timeout=4000)
+            print(f"  Upload clicado via: '{selector}'")
+            clicked_upload = True
             break
         except Exception:
             continue
-    else:
-        print("FALHA: nao encontrou 'Upload notebook'")
+
+    if not clicked_upload:
+        print("FALHA: 'Fazer upload de notebook' nao encontrado")
         items = await page.query_selector_all('[role="menuitem"]')
-        print("Itens de menu encontrados:")
+        print(f"Itens do menu ({len(items)}):")
         for item in items:
-            t = await item.inner_text()
-            if t.strip():
-                print(f"  '{t.strip()}'")
+            try:
+                t = (await item.inner_text()).strip()
+                if t:
+                    print(f"  '{t}'")
+            except Exception:
+                pass
         return False
 
     await asyncio.sleep(2)
 
+    # Injetar arquivo no input[type="file"]
     file_input = await page.query_selector('input[type="file"]')
     if not file_input:
-        for sel in ['text=Browse', 'text=Choose file', 'button:has-text("Browse")']:
-            try:
-                await page.click(sel, timeout=3000)
-                file_input = await page.query_selector('input[type="file"]')
-                if file_input:
-                    break
-            except Exception:
-                continue
-
-    if not file_input:
         print("FALHA: input[type='file'] nao encontrado")
-        dialogs = await page.query_selector_all('[role="dialog"], mat-dialog-container')
-        for d in dialogs:
-            print(await d.inner_text())
         return False
 
     await file_input.set_input_files(str(notebook_path))
-    print(f"Arquivo injetado: {notebook_path.name}")
+    print(f"  Arquivo injetado: {notebook_path.name}")
     await asyncio.sleep(4)
 
     title = await page.title()
-    print(f"Titulo da pagina apos upload: {title}")
+    print(f"Titulo apos upload: {title}")
     return True
 
 
@@ -111,7 +132,7 @@ async def main():
         browser = await p.chromium.connect_over_cdp(CDP_URL)
         ctx  = browser.contexts[0] if browser.contexts else None
         if not ctx:
-            print("FALHA: nenhum contexto CDP encontrado")
+            print("FALHA: nenhum contexto CDP")
             proc.terminate()
             return
 
@@ -126,9 +147,9 @@ async def main():
 
         ok = await upload_notebook(page, NOTEBOOK)
         if ok:
-            print("OK - Notebook carregado com sucesso!")
+            print("\nOK - Notebook carregado!")
         else:
-            print("FALHA - Verificar seletores acima")
+            print("\nFALHA - Ver mensagens acima")
 
         print("Aguardando 5s para verificacao visual...")
         await asyncio.sleep(5)
