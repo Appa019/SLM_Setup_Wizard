@@ -1,10 +1,10 @@
 """Recomenda modelos open-source para fine-tuning usando GPT-5.1 (Responses API).
 GPT-5.1 escolhe dinamicamente os melhores modelos do ecossistema HuggingFace.
 """
-import json
 from openai import AsyncOpenAI
 from config import settings
 from services.cost_tracker import record
+from utils.json_extract import extract_json_object
 
 SYSTEM_PROMPT = (
     "You are an expert ML engineer specializing in LLM fine-tuning and the HuggingFace open-source "
@@ -186,10 +186,8 @@ async def get_recommendations(hardware: dict) -> list[dict]:
                         output_text = block.text
                         break
 
-        start = output_text.find("{")
-        end   = output_text.rfind("}") + 1
-        if start >= 0 and end > start:
-            data = json.loads(output_text[start:end])
+        data = extract_json_object(output_text)
+        if data is not None:
             recs = data.get("recommendations", [])
             if recs:
                 return _enrich(recs, effective)

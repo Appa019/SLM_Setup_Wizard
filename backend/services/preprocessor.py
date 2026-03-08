@@ -6,6 +6,7 @@ from pathlib import Path
 from openai import AsyncOpenAI
 from config import settings
 from services.cost_tracker import record
+from utils.json_extract import extract_json_array
 
 DATA_RAW = Path(__file__).parent.parent.parent / "data" / "raw"
 DATA_PROCESSED = Path(__file__).parent.parent.parent / "data" / "processed"
@@ -71,10 +72,7 @@ async def _process_chunk(client: AsyncOpenAI, chunk: str, topic: str) -> list[di
                     if getattr(block, "type", "") == "output_text":
                         content = block.text
                         break
-        start = content.find("[")
-        end = content.rfind("]") + 1
-        if start >= 0 and end > start:
-            return json.loads(content[start:end])
+        return extract_json_array(content) or []
     except Exception:
         pass
     return []

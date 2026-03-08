@@ -44,7 +44,8 @@ export default function ScrapingProgress() {
     }
     es.onerror = () => es.close()
     return () => es.close()
-  }, [setCurrentStep])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const pct = st && st.total > 0 ? Math.round((st.done / st.total) * 100) : 0
 

@@ -1,8 +1,8 @@
 # backend/services/query_generator.py
-import json
 from openai import AsyncOpenAI
 from config import settings
 from services.cost_tracker import record
+from utils.json_extract import extract_json_array
 
 QUERY_PROMPT = """Voce recebe o perfil de um dominio de conhecimento e deve gerar exatamente 50 queries de busca na web.
 
@@ -65,12 +65,9 @@ async def generate_queries(topic_profile: dict) -> list[str]:
                         break
 
         # Parsear JSON array
-        start = text.find("[")
-        end   = text.rfind("]") + 1
-        if start >= 0 and end > start:
-            queries = json.loads(text[start:end])
-            if isinstance(queries, list) and queries:
-                return [str(q) for q in queries if q]
+        queries = extract_json_array(text)
+        if isinstance(queries, list) and queries:
+            return [str(q) for q in queries if q]
 
     except Exception:
         pass

@@ -2,10 +2,10 @@
 Gera hiperparametros otimos para fine-tuning usando GPT-5.1 via Responses API.
 Decide tambem se treinar localmente (GPU usuario > T4) ou no Colab T4.
 """
-import json
 from openai import AsyncOpenAI
 from config import settings
 from services.cost_tracker import record
+from utils.json_extract import extract_json_object
 
 T4_VRAM_GB = 15.0  # VRAM do Colab T4 free tier
 
@@ -177,10 +177,9 @@ async def generate_hyperparams(
                         break
 
         # Parse JSON
-        start = output_text.find("{")
-        end   = output_text.rfind("}") + 1
-        if start >= 0 and end > start:
-            return json.loads(output_text[start:end])
+        parsed = extract_json_object(output_text)
+        if parsed is not None:
+            return parsed
 
     except Exception as e:
         import logging

@@ -1,7 +1,7 @@
-import json
 from openai import AsyncOpenAI
 from config import settings
 from services.cost_tracker import record
+from utils.json_extract import extract_json_object
 
 SYSTEM_PROMPT = """Voce e um assistente especializado em ajudar usuarios a definir o tema
 para fine-tuning de um modelo de linguagem local (LLM).
@@ -78,11 +78,4 @@ async def finalize_topic(messages: list[dict]) -> dict:
                 if getattr(block, "type", "") == "output_text":
                     content = block.text
                     break
-    start = content.find("{")
-    end   = content.rfind("}") + 1
-    if start >= 0 and end > start:
-        try:
-            return json.loads(content[start:end])
-        except json.JSONDecodeError:
-            pass
-    return {}
+    return extract_json_object(content) or {}
