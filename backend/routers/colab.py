@@ -5,7 +5,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from services.colab_manager import generate_notebook, generate_local_script, make_slug, write_sidecar
-from services.colab_playwright import run_colab_automation, get_training_state
+from services.colab_playwright import run_colab_automation, get_training_state, reset_training_state
 from services.hyperparams import generate_hyperparams, T4_VRAM_GB
 
 router = APIRouter()
@@ -110,6 +110,9 @@ async def start_colab(body: ColabStartRequest, background_tasks: BackgroundTasks
     # Caso contrario → notebook Colab + automacao Playwright
     notebook_path = generate_notebook(body.model_id, body.topic_profile, params, model_slug, hf_id=body.hf_id)
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    # Resetar estado ANTES de agendar a task — evita race condition
+    # onde o SSE recebe finished=True do run anterior
+    reset_training_state()
     background_tasks.add_task(run_colab_automation, notebook_path, dataset_path, MODELS_DIR)
     return {
         "ok":            True,

@@ -1,5 +1,6 @@
 import json
 import re
+import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -100,9 +101,9 @@ def generate_notebook(model_id: str, topic_profile: dict,
             "from pathlib import Path\n"
             "import torch\n"
             "from datasets import Dataset\n"
-            "from transformers import AutoModelForCausalLM, AutoTokenizer, TrainingArguments, BitsAndBytesConfig\n"
-            "from peft import LoraConfig, get_peft_model\n"
-            "from trl import SFTTrainer\n"
+            "from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig\n"
+            "from peft import LoraConfig\n"
+            "from trl import SFTTrainer, SFTConfig\n"
             'print(f"CUDA available: {torch.cuda.is_available()}")\n'
             'print(f"GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \'CPU\'}")'
         ),
@@ -169,7 +170,7 @@ def generate_notebook(model_id: str, topic_profile: dict,
             'print("Modelo carregado!")'
         ),
 
-        # Cell 8: LoRA config (dynamic)
+        # Cell 8: LoRA config + Training (SFTConfig API)
         _code_cell(
             "lora_config = LoraConfig(\n"
             "    r=LORA_R,\n"
@@ -179,13 +180,7 @@ def generate_notebook(model_id: str, topic_profile: dict,
             "    bias='none',\n"
             "    task_type='CAUSAL_LM',\n"
             ")\n\n"
-            "model = get_peft_model(model, lora_config)\n"
-            "model.print_trainable_parameters()"
-        ),
-
-        # Cell 9: Training (dynamic params)
-        _code_cell(
-            "training_args = TrainingArguments(\n"
+            "training_args = SFTConfig(\n"
             "    output_dir='./results',\n"
             "    num_train_epochs=NUM_EPOCHS,\n"
             "    per_device_train_batch_size=BATCH_SIZE,\n"
@@ -200,26 +195,26 @@ def generate_notebook(model_id: str, topic_profile: dict,
             "    weight_decay=WEIGHT_DECAY,\n"
             "    lr_scheduler_type='cosine',\n"
             "    report_to='none',\n"
+            "    max_length=MAX_SEQ_LENGTH,\n"
             ")\n\n"
             "trainer = SFTTrainer(\n"
             "    model=model,\n"
             "    train_dataset=dataset['train'],\n"
             "    eval_dataset=dataset['test'],\n"
-            "    dataset_text_field='text',\n"
-            "    max_seq_length=MAX_SEQ_LENGTH,\n"
-            "    tokenizer=tokenizer,\n"
+            "    processing_class=tokenizer,\n"
             "    args=training_args,\n"
             "    peft_config=lora_config,\n"
             ")\n\n"
+            "trainer.model.print_trainable_parameters()\n"
             "print('Iniciando treinamento...')\n"
             "trainer.train()\n"
             "print('Treinamento concluido!')"
         ),
 
-        # Cell 10: Save merged model
+        # Cell 9: Save merged model
         _code_cell(
             "from peft import PeftModel\n"
-            "model.save_pretrained('./lora_adapter')\n"
+            "trainer.model.save_pretrained('./lora_adapter')\n"
             "tokenizer.save_pretrained('./lora_adapter')\n\n"
             "base_model = AutoModelForCausalLM.from_pretrained(\n"
             "    MODEL_ID, torch_dtype=torch.float16, device_map='auto', trust_remote_code=True\n"
@@ -231,19 +226,32 @@ def generate_notebook(model_id: str, topic_profile: dict,
             'print("Modelo merged salvo!")'
         ),
 
-        # Cell 11: Convert to GGUF (dynamic quant type)
+        # Cell 10: Convert to GGUF (two-step: f16 + quantize)
         _code_cell(
             "!git clone https://github.com/ggerganov/llama.cpp /content/llama.cpp\n"
             "!pip install -q gguf\n"
-            f"!python /content/llama.cpp/convert_hf_to_gguf.py ./merged_model "
-            f"--outfile ./{gguf_name} --outtype {{GGUF_QUANT_TYPE}}\n"
-            'print("Conversao para GGUF concluida!")\n'
+            "!cd /content/llama.cpp && cmake -B build && cmake --build build --config Release -j\n\n"
+            "!python /content/llama.cpp/convert_hf_to_gguf.py ./merged_model "
+            "--outfile ./model-f16.gguf --outtype f16\n\n"
+            "import subprocess, shutil\n"
+            "DIRECT_TYPES = {'f16', 'f32', 'bf16', 'q8_0'}\n"
+            "if GGUF_QUANT_TYPE.lower() in DIRECT_TYPES:\n"
+            f"    shutil.move('./model-f16.gguf', './{gguf_name}')\n"
+            "    print(f'Modelo salvo como {{GGUF_QUANT_TYPE}} (direto)')\n"
+            "else:\n"
+            "    subprocess.run([\n"
+            "        '/content/llama.cpp/build/bin/llama-quantize',\n"
+            f"        './model-f16.gguf', './{gguf_name}', GGUF_QUANT_TYPE\n"
+            "    ], check=True)\n"
+            "    import os as _os\n"
+            "    _os.remove('./model-f16.gguf')\n"
+            "    print(f'Quantizado para {{GGUF_QUANT_TYPE}}')\n\n"
             "import os\n"
             f"size = os.path.getsize('./{gguf_name}') / (1024**3)\n"
             'print(f"Tamanho: {size:.2f} GB")'
         ),
 
-        # Cell 12: Download
+        # Cell 11: Download
         _code_cell(
             "from google.colab import files\n"
             'print("Iniciando download do modelo GGUF...")\n'
@@ -314,9 +322,9 @@ def generate_local_script(model_id: str, topic_profile: dict,
         "import json, os\n"
         "import torch\n"
         "from datasets import Dataset\n"
-        "from transformers import AutoModelForCausalLM, AutoTokenizer, TrainingArguments, BitsAndBytesConfig\n"
-        "from peft import LoraConfig, get_peft_model, PeftModel\n"
-        "from trl import SFTTrainer\n\n"
+        "from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig\n"
+        "from peft import LoraConfig, PeftModel\n"
+        "from trl import SFTTrainer, SFTConfig\n\n"
         "print(f'CUDA: {torch.cuda.is_available()}')\n"
         "print(f'GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"CPU\"}')\n\n"
         "# Carregar dataset\n"
@@ -359,10 +367,8 @@ def generate_local_script(model_id: str, topic_profile: dict,
         "lora_config = LoraConfig(\n"
         "    r=LORA_R, lora_alpha=LORA_ALPHA, target_modules=TARGET_MODULES,\n"
         "    lora_dropout=LORA_DROPOUT, bias='none', task_type='CAUSAL_LM',\n"
-        ")\n"
-        "model = get_peft_model(model, lora_config)\n"
-        "model.print_trainable_parameters()\n\n"
-        "training_args = TrainingArguments(\n"
+        ")\n\n"
+        "training_args = SFTConfig(\n"
         "    output_dir=OUTPUT_DIR, num_train_epochs=NUM_EPOCHS,\n"
         "    per_device_train_batch_size=BATCH_SIZE,\n"
         "    gradient_accumulation_steps=GRADIENT_ACCUMULATION,\n"
@@ -370,21 +376,44 @@ def generate_local_script(model_id: str, topic_profile: dict,
         "    gradient_checkpointing=GRADIENT_CHECKPOINTING,\n"
         "    logging_steps=10, save_steps=100, warmup_ratio=WARMUP_RATIO,\n"
         "    weight_decay=WEIGHT_DECAY, lr_scheduler_type='cosine', report_to='none',\n"
+        "    max_length=MAX_SEQ_LENGTH,\n"
         ")\n\n"
         "trainer = SFTTrainer(\n"
         "    model=model, train_dataset=dataset['train'], eval_dataset=dataset['test'],\n"
-        "    dataset_text_field='text', max_seq_length=MAX_SEQ_LENGTH,\n"
-        "    tokenizer=tokenizer, args=training_args, peft_config=lora_config,\n"
+        "    processing_class=tokenizer, args=training_args, peft_config=lora_config,\n"
         ")\n"
+        "trainer.model.print_trainable_parameters()\n"
         "print('Iniciando treinamento local...')\n"
         "trainer.train()\n"
         "print('Treinamento concluido!')\n\n"
-        "# Salvar e converter para GGUF\n"
-        "model.save_pretrained('./lora_adapter')\n"
+        "# Salvar adapter e fazer merge\n"
+        "trainer.model.save_pretrained('./lora_adapter')\n"
         "tokenizer.save_pretrained('./lora_adapter')\n"
-        "print('Adapter salvo em ./lora_adapter')\n"
-        "print(f'Para converter para GGUF execute:')\n"
-        f"print(f'python llama.cpp/convert_hf_to_gguf.py ./lora_adapter --outfile {gguf_name} --outtype {{GGUF_QUANT_TYPE}}')\n"
+        "print('Adapter salvo em ./lora_adapter')\n\n"
+        "base_model = AutoModelForCausalLM.from_pretrained(\n"
+        "    MODEL_ID, torch_dtype=torch.float16, device_map='auto', trust_remote_code=True\n"
+        ")\n"
+        "merged = PeftModel.from_pretrained(base_model, './lora_adapter')\n"
+        "merged = merged.merge_and_unload()\n"
+        "merged.save_pretrained('./merged_model')\n"
+        "tokenizer.save_pretrained('./merged_model')\n"
+        "print('Modelo merged salvo em ./merged_model')\n\n"
+        "# Converter para GGUF (dois passos)\n"
+        "import subprocess, shutil\n"
+        "print('Convertendo para GGUF...')\n"
+        "subprocess.run(['python', 'llama.cpp/convert_hf_to_gguf.py', './merged_model',\n"
+        "    '--outfile', './model-f16.gguf', '--outtype', 'f16'], check=True)\n"
+        "DIRECT_TYPES = {'f16', 'f32', 'bf16', 'q8_0'}\n"
+        "if GGUF_QUANT_TYPE.lower() in DIRECT_TYPES:\n"
+        f"    shutil.move('./model-f16.gguf', './{gguf_name}')\n"
+        "    print(f'Modelo salvo como {{GGUF_QUANT_TYPE}} (direto)')\n"
+        "else:\n"
+        "    subprocess.run(['llama.cpp/build/bin/llama-quantize',\n"
+        f"        './model-f16.gguf', './{gguf_name}', GGUF_QUANT_TYPE], check=True)\n"
+        "    os.remove('./model-f16.gguf')\n"
+        "    print(f'Quantizado para {{GGUF_QUANT_TYPE}}')\n"
+        f"size = os.path.getsize('./{gguf_name}') / (1024**3)\n"
+        "print(f'Tamanho final: {{size:.2f}} GB')\n"
     )
 
     output_path = COLAB_DIR / f"{model_slug}_local.py"
@@ -393,31 +422,40 @@ def generate_local_script(model_id: str, topic_profile: dict,
     # Gerar requirements.txt
     req_path = COLAB_DIR / "requirements.txt"
     req_path.write_text(
-        "torch>=2.1.0\n"
-        "transformers>=4.38.0\n"
-        "peft>=0.9.0\n"
-        "bitsandbytes>=0.42.0\n"
-        "accelerate>=0.27.0\n"
-        "datasets>=2.17.0\n"
-        "trl>=0.7.11\n"
+        "torch>=2.5.0\n"
+        "transformers>=4.47.0\n"
+        "peft>=0.14.0\n"
+        "bitsandbytes>=0.45.0\n"
+        "accelerate>=1.2.0\n"
+        "datasets>=3.2.0\n"
+        "trl>=0.29.0\n"
         "sentencepiece\n"
+        "gguf\n"
     )
     return output_path
+
+
+def _split_source(source: str) -> list[str]:
+    """Converte source string em lista de linhas (padrao nbformat 4.5+)."""
+    lines = source.split("\n")
+    return [line + "\n" for line in lines[:-1]] + ([lines[-1]] if lines[-1] else [])
 
 
 def _code_cell(source: str) -> dict:
     return {
         "cell_type": "code",
         "execution_count": None,
+        "id": uuid.uuid4().hex[:8],
         "metadata": {},
         "outputs": [],
-        "source": source,
+        "source": _split_source(source),
     }
 
 
 def _markdown_cell(source: str) -> dict:
     return {
         "cell_type": "markdown",
+        "id": uuid.uuid4().hex[:8],
         "metadata": {},
-        "source": source,
+        "source": _split_source(source),
     }

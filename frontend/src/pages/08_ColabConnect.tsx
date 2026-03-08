@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Monitor, Upload, Cpu, Play, ArrowRight, ArrowLeft, CheckCircle2, Info, Terminal, Laptop } from 'lucide-react'
+import { Monitor, Upload, Cpu, Play, ArrowRight, ArrowLeft, CheckCircle2, Info, Terminal, Laptop, FileUp } from 'lucide-react'
 import { motion } from 'framer-motion'
 import Layout from '../components/Layout'
 import { useWizard } from '../context/WizardContext'
@@ -12,6 +12,7 @@ const STEPS = [
   { icon: Upload,        label: 'Fazendo upload do notebook...' },
   { icon: Cpu,           label: 'Configurando runtime GPU (T4)...' },
   { icon: Play,          label: 'Iniciando execucao das celulas...' },
+  { icon: FileUp,        label: 'Injetando dataset de treinamento...' },
 ]
 
 interface HyperParams {
@@ -238,12 +239,11 @@ export default function ColabConnect() {
               <div className="card-sm space-y-2">
                 <p className="section-title mb-2">Acoes no browser aberto</p>
                 {[
-                  'Faca login na conta Google se solicitado',
-                  <>File → Upload notebook → selecione <span className="code">generated_notebook.ipynb</span></>,
-                  'Runtime → Change runtime type → T4 GPU',
-                  'Runtime → Run all (Ctrl+F9)',
-                  <>Na celula de upload, selecione <span className="code">training_data.jsonl</span></>,
-                  <>Aguarde o fim e faca download do <span className="code">modelo_final.gguf</span></>,
+                  'Login automatico via cookies salvos (ou manual na primeira vez)',
+                  'Upload do notebook, GPU T4 e Run All sao automaticos',
+                  'Dataset injetado automaticamente na celula de upload',
+                  'Download do modelo GGUF detectado ao finalizar',
+                  <>Apos a primeira vez, tudo roda em <span className="code">headless</span> (sem tela)</>,
                 ].map((s, i) => (
                   <div key={i} className="flex gap-2 text-xs text-gray-600">
                     <span className="w-4 h-4 rounded-sm bg-surface-200 text-gray-500 flex items-center justify-center text-[10px] font-bold flex-shrink-0">{i+1}</span>
