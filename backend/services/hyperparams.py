@@ -1,5 +1,5 @@
 """
-Gera hiperparametros otimos para fine-tuning usando GPT-5.4 via Responses API.
+Gera hiperparametros otimos para fine-tuning usando GPT-5.1 via Responses API.
 Decide tambem se treinar localmente (GPU usuario > T4) ou no Colab T4.
 """
 import json
@@ -124,7 +124,7 @@ async def generate_hyperparams(
     dataset_pairs: int = 2000,
 ) -> dict:
     """
-    Chama GPT-5.4 via Responses API com reasoning high para gerar
+    Chama GPT-5.1 via Responses API com reasoning high para gerar
     hiperparametros otimos. Decide local vs Colab automaticamente.
     Se user_vram > T4 (15GB) → training_target = 'local', senao 'colab'.
     """
@@ -149,7 +149,7 @@ async def generate_hyperparams(
 
     try:
         response = await client.responses.create(
-            model="gpt-5.4",
+            model="gpt-5.1",
             reasoning={"effort": "high"},
             store=True,
             input=[
@@ -162,7 +162,7 @@ async def generate_hyperparams(
         usage = getattr(response, "usage", None)
         if usage:
             record(
-                "gpt-5.4", "hyperparams",
+                "gpt-5.1", "hyperparams",
                 getattr(usage, "input_tokens", 0),
                 getattr(usage, "output_tokens", 0),
             )
@@ -190,7 +190,7 @@ async def generate_hyperparams(
 
 
 def _conservative_defaults(model_id: str, user_vram: float, dataset_pairs: int) -> dict:
-    """Defaults conservadores quando GPT-5.4 nao esta disponivel."""
+    """Defaults conservadores quando GPT-5.1 nao esta disponivel."""
     target = "local" if user_vram > T4_VRAM_GB else "colab"
     r      = 8 if dataset_pairs < 1000 else (16 if dataset_pairs < 5000 else 32)
     vram   = max(user_vram, T4_VRAM_GB)

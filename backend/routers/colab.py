@@ -53,7 +53,7 @@ async def start_colab(body: ColabStartRequest, background_tasks: BackgroundTasks
     except Exception:
         dataset_pairs = 2000
 
-    # Gerar hiperparametros otimos via GPT-5.4
+    # Gerar hiperparametros otimos via GPT-5.1
     params = await generate_hyperparams(
         model_id=body.model_id,
         quant_type=body.quant_type,
@@ -61,8 +61,8 @@ async def start_colab(body: ColabStartRequest, background_tasks: BackgroundTasks
         dataset_pairs=dataset_pairs,
     )
 
-    # Enforcement deterministico da regra GPU — nao depende so do GPT-5.4.
-    # O GPT-5.4 otimiza lora_r, batch_size, etc., mas a decisao de onde treinar
+    # Enforcement deterministico da regra GPU — nao depende so do GPT-5.1.
+    # O GPT-5.1 otimiza lora_r, batch_size, etc., mas a decisao de onde treinar
     # e sempre determinada pelo hardware real do usuario.
     user_vram: float = body.hardware.get("vram_gb") or 0.0
     if user_vram > T4_VRAM_GB:

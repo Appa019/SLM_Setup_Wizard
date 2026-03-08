@@ -6,8 +6,9 @@ COSTS_FILE = Path(__file__).parent.parent.parent / "data" / "costs.jsonl"
 
 # Precos OpenAI 2026 (USD por 1M tokens)
 PRICING: dict[str, dict[str, float]] = {
-    "gpt-5.4":       {"in": 7.50,  "out": 30.00},
-    "gpt-5.4-pro":   {"in": 15.00, "out": 60.00},
+    "gpt-5.1":       {"in": 5.00,  "out": 20.00},
+    "gpt-5.4":       {"in": 7.50,  "out": 30.00},   # mantido na tabela para compatibilidade
+    "gpt-5.4-pro":   {"in": 15.00, "out": 60.00},  # mantido na tabela para compatibilidade
     "gpt-5.2":       {"in": 3.50,  "out": 14.00},
     "gpt-4o":        {"in": 2.50,  "out": 10.00},
     "gpt-4o-mini":   {"in": 0.15,  "out": 0.60},
@@ -23,7 +24,7 @@ PHASE_LABELS = {
     "model_recommendation": "Recomendacao de modelo",
     "chat":                 "Chat de tema",
     "preprocessing":        "Pre-processamento",
-    "hyperparams":          "Hiperparametros (GPT-5.4)",
+    "hyperparams":          "Hiperparametros (GPT-5.1)",
     "other":                "Outros",
 }
 

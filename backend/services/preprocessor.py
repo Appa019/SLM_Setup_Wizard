@@ -64,7 +64,13 @@ async def _process_chunk(client: AsyncOpenAI, chunk: str, topic: str) -> list[di
             record("gpt-4o-mini", "preprocessing",
                    getattr(usage, "input_tokens", 0),
                    getattr(usage, "output_tokens", 0))
-        content = response.output_text or "[]"
+        content = "[]"
+        for item in response.output:
+            if getattr(item, "type", "") == "message":
+                for block in item.content:
+                    if getattr(block, "type", "") == "output_text":
+                        content = block.text
+                        break
         start = content.find("[")
         end = content.rfind("]") + 1
         if start >= 0 and end > start:

@@ -54,7 +54,7 @@ def generate_notebook(model_id: str, topic_profile: dict,
 
     config_cell = _code_cell(
         "# ╔══════════════════════════════════════════╗\n"
-        "# ║  CONFIGURACAO GERADA PELA IA (GPT-5.4)  ║\n"
+        "# ║  CONFIGURACAO GERADA PELA IA (GPT-5.1)  ║\n"
         "# ║  Ajuste manualmente se necessario        ║\n"
         "# ╚══════════════════════════════════════════╝\n"
         f'MODEL_ID                  = "{hf_model}"\n'
@@ -284,7 +284,7 @@ def generate_local_script(model_id: str, topic_profile: dict,
         "#!/usr/bin/env python3\n"
         f'"""Fine-tuning local: {topic_area} — Gerado pelo Modelo SLM Local Wizard"""\n\n'
         "# ╔══════════════════════════════════════════╗\n"
-        "# ║  CONFIGURACAO GERADA PELA IA (GPT-5.4)  ║\n"
+        "# ║  CONFIGURACAO GERADA PELA IA (GPT-5.1)  ║\n"
         "# ║  Ajuste manualmente se necessario        ║\n"
         "# ╚══════════════════════════════════════════╝\n"
         f'MODEL_ID                  = "{hf_model}"\n'

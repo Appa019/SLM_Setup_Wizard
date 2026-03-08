@@ -1,5 +1,5 @@
-"""Recomenda modelos open-source para fine-tuning usando GPT-5.4 (Responses API).
-GPT-5.4 escolhe dinamicamente os melhores modelos do ecossistema HuggingFace.
+"""Recomenda modelos open-source para fine-tuning usando GPT-5.1 (Responses API).
+GPT-5.1 escolhe dinamicamente os melhores modelos do ecossistema HuggingFace.
 """
 import json
 from openai import AsyncOpenAI
@@ -160,8 +160,8 @@ async def get_recommendations(hardware: dict) -> list[dict]:
     try:
         client   = AsyncOpenAI(api_key=settings.openai_api_key)
         response = await client.responses.create(
-            model="gpt-5.2",
-            reasoning={"effort": "medium"},
+            model="gpt-5.1",
+            reasoning={"effort": "high"},
             store=True,
             tools=[{"type": "web_search_preview"}],
             input=[
@@ -173,7 +173,7 @@ async def get_recommendations(hardware: dict) -> list[dict]:
         usage = getattr(response, "usage", None)
         if usage:
             record(
-                "gpt-5.2", "model_recommendation",
+                "gpt-5.1", "model_recommendation",
                 getattr(usage, "input_tokens", 0),
                 getattr(usage, "output_tokens", 0),
             )

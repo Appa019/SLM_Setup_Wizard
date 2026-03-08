@@ -71,9 +71,18 @@ async def finalize_topic(messages: list[dict]) -> dict:
         record("gpt-4o-mini", "chat",
                getattr(usage, "input_tokens", 0),
                getattr(usage, "output_tokens", 0))
-    content = response.output_text or "{}"
+    content = "{}"
+    for item in response.output:
+        if getattr(item, "type", "") == "message":
+            for block in item.content:
+                if getattr(block, "type", "") == "output_text":
+                    content = block.text
+                    break
     start = content.find("{")
     end   = content.rfind("}") + 1
     if start >= 0 and end > start:
-        return json.loads(content[start:end])
+        try:
+            return json.loads(content[start:end])
+        except json.JSONDecodeError:
+            pass
     return {}
