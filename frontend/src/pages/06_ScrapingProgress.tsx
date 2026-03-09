@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Link2 } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { CheckCircle2, AlertCircle, ArrowRight, ArrowLeft, Link2, Search } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import Layout from '../components/Layout'
 import { useWizard } from '../context/WizardContext'
 import { SSE_BASE } from '../lib/api'
@@ -10,6 +10,8 @@ interface ScrapeState {
   running: boolean; total: number; done: number; failed: number
   current_url: string; bytes_collected: number
   start_time: number; finished: boolean; error: string
+  phase: 'idle' | 'collecting_links' | 'scraping'
+  links_found: number; queries_done: number; queries_total: number
 }
 
 const fmtBytes = (b: number) => {
@@ -58,6 +60,67 @@ export default function ScrapingProgress() {
             <ArrowLeft size={13} /> Voltar
           </button>
         </div>
+
+        {/* Phase 1 — collecting links loader */}
+        <AnimatePresence>
+          {st?.phase === 'collecting_links' && (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+              className="card border-l-2 border-l-accent-500 space-y-3"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Search size={13} className="text-accent-500" />
+                  <span className="font-display text-[11px] font-bold uppercase tracking-[0.08em] text-gray-900">
+                    Fase 1 — Coletando links
+                  </span>
+                </div>
+                <span className="badge-blue">
+                  {st.queries_done}/{st.queries_total} queries
+                </span>
+              </div>
+
+              {/* Scanning bar */}
+              <div className="relative h-6 bg-gray-950 overflow-hidden border border-gray-800">
+                <motion.div
+                  className="absolute inset-y-0 w-16 bg-gradient-to-r from-transparent via-accent-400/60 to-transparent"
+                  animate={{ x: ['-4rem', '100%'] }}
+                  transition={{ repeat: Infinity, duration: 1.4, ease: 'linear' }}
+                />
+                <div className="absolute inset-0 flex items-center px-2">
+                  <span className="text-green-400 font-mono text-[10px] truncate">
+                    {st.current_url || 'aguardando...'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] text-gray-500">
+                <span>{st.links_found} links encontrados até agora</span>
+                <motion.span
+                  animate={{ opacity: [1, 0.3, 1] }}
+                  transition={{ repeat: Infinity, duration: 1.2 }}
+                  className="text-accent-500 font-medium"
+                >
+                  buscando...
+                </motion.span>
+              </div>
+
+              {/* Query progress bar */}
+              <div className="space-y-1">
+                <div className="h-1 bg-surface-200 rounded-sm overflow-hidden">
+                  <motion.div
+                    className="h-full bg-accent-500"
+                    animate={{ width: st.queries_total > 0 ? `${Math.round((st.queries_done / st.queries_total) * 100)}%` : '0%' }}
+                    transition={{ duration: 0.3 }}
+                  />
+                </div>
+                <p className="text-[10px] text-gray-400 font-mono">
+                  {st.queries_total > 0 ? Math.round((st.queries_done / st.queries_total) * 100) : 0}% das queries processadas
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Progress bar */}
         <div className="card space-y-3">

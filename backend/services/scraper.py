@@ -17,6 +17,7 @@ scraping_state: dict = {
     "running": False, "total": 0, "done": 0, "failed": 0,
     "current_url": "", "bytes_collected": 0,
     "start_time": 0.0, "finished": False, "error": "",
+    "phase": "idle", "links_found": 0, "queries_done": 0, "queries_total": 0,
 }
 
 # ── Pool de 40 User-Agents reais ──────────────────────────────────────────────
@@ -224,6 +225,8 @@ async def run_scraping(topic_profile: dict, query_count: int = 50, custom_querie
         "running": True, "total": url_count, "done": 0, "failed": 0,
         "current_url": "", "bytes_collected": 0,
         "start_time": time.time(), "finished": False, "error": "",
+        "phase": "collecting_links", "links_found": 0,
+        "queries_done": 0, "queries_total": len(keywords),
     })
     results:  list[dict] = []
     limiter   = DomainRateLimiter(max_per_minute=3)
@@ -241,7 +244,10 @@ async def run_scraping(topic_profile: dict, query_count: int = 50, custom_querie
             scraping_state["current_url"] = search_url
             html = await _fetch_with_retry(client, search_url)
             if html:
-                all_links.extend(_extract_links(html))
+                new_links = _extract_links(html)
+                all_links.extend(new_links)
+                scraping_state["links_found"] = len(all_links)
+            scraping_state["queries_done"] += 1
             # Delay humanizado entre buscas
             await asyncio.sleep(random.uniform(2.0, 4.0))
 
@@ -252,6 +258,7 @@ async def run_scraping(topic_profile: dict, query_count: int = 50, custom_querie
         all_links = list(dict.fromkeys(safe + others))[:url_count]
         scraping_state["total"] = len(all_links)
 
+        scraping_state["phase"] = "scraping"
         # ── Phase 2: scraping paralelo com semaforo ────────────────────────
         sem = asyncio.Semaphore(4)
 
