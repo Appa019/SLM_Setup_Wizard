@@ -13,6 +13,7 @@ training_state: dict = {
     "finished": False,
     "error": "",
     "model_path": "",
+    "dataset_injected": False,
 }
 
 STEPS = [
@@ -52,6 +53,7 @@ def reset_training_state():
         "running": True, "step": "", "steps_done": [], "log": [],
         "metrics": {"epoch": 0, "loss": None, "step": 0},
         "finished": False, "error": "", "model_path": "",
+        "dataset_injected": False,
     })
 
 
@@ -185,6 +187,35 @@ async def _inject_dataset(page, dataset_path: Path, timeout_s: int = 300):
     return False
 
 
+import re as _re
+
+async def _parse_training_metrics(output_text: str):
+    """Extrai epoch, loss e step do output do SFTTrainer no Colab e atualiza training_state."""
+    # Formato dict do HF Trainer: {'loss': 1.2345, 'epoch': 1.5, ...}
+    for m in _re.finditer(r"\{[^}]*'loss'\s*:\s*([\d.]+)[^}]*\}", output_text):
+        try:
+            block = m.group(0)
+            loss  = float(_re.search(r"'loss'\s*:\s*([\d.]+)", block).group(1))
+            epoch_m = _re.search(r"'epoch'\s*:\s*([\d.]+)", block)
+            step_m  = _re.search(r"'step'\s*:\s*(\d+)", block)
+            training_state["metrics"]["loss"]  = round(loss, 4)
+            if epoch_m:
+                training_state["metrics"]["epoch"] = round(float(epoch_m.group(1)), 2)
+            if step_m:
+                training_state["metrics"]["step"]  = int(step_m.group(1))
+        except Exception:
+            pass
+
+    # Formato tqdm: " 50/200 [01:30, loss=1.234, epoch=1]"
+    for m in _re.finditer(r"(\d+)/\d+.*?loss=([\d.]+).*?epoch=([\d.]+)", output_text):
+        try:
+            training_state["metrics"]["step"]  = int(m.group(1))
+            training_state["metrics"]["loss"]  = round(float(m.group(2)), 4)
+            training_state["metrics"]["epoch"] = round(float(m.group(3)), 2)
+        except Exception:
+            pass
+
+
 async def run_colab_automation(notebook_path: Path, dataset_path: Path, model_out_dir: Path):
     """
     Automacao completa do Google Colab usando Chrome real via subprocess + CDP.
@@ -282,9 +313,19 @@ async def run_colab_automation(notebook_path: Path, dataset_path: Path, model_ou
             # ── 2. Detectar login ─────────────────────────────────
             _update_step(STEPS[1])
             logged_in = False
-            # Minimo 2 checks consecutivos sem botao de login para confirmar
+
+            # Wait for page to fully render before checking auth state.
+            # Colab takes 1-3s to mount the sign-in button, so starting
+            # immediately can produce false-positives (consecutive_ok hits
+            # threshold before the button appears).
+            _log("Aguardando pagina do Colab carregar...")
+            await asyncio.sleep(8)
+
+            # Require 4 consecutive positive confirmations (account element
+            # visible) to declare login — prevents false positives during
+            # slow DOM rendering.
             consecutive_ok = 0
-            for i in range(100):  # ate 5 min (100 × 3s)
+            for i in range(100):  # up to 5 min (100 × 3s)
                 try:
                     url = page.url
                     if "accounts.google.com" in url:
@@ -300,8 +341,12 @@ async def run_colab_automation(notebook_path: Path, dataset_path: Path, model_ou
                         training_state["metrics"]["step"] = i * 3
                         await asyncio.sleep(3)
                         continue
+
+                    # Broad sign-in button selectors — cover PT-BR and EN variants
                     sign_in = await page.query_selector(
-                        'a[aria-label="Fazer login"],a[aria-label="Sign in"]'
+                        'a[aria-label="Fazer login"],a[aria-label="Sign in"],'
+                        'a:has-text("Fazer login"),button:has-text("Sign in"),'
+                        '[data-auth="login"]'
                     )
                     if sign_in:
                         consecutive_ok = 0
@@ -317,12 +362,22 @@ async def run_colab_automation(notebook_path: Path, dataset_path: Path, model_ou
                         training_state["metrics"]["step"] = i * 3
                         await asyncio.sleep(3)
                         continue
-                    # Sem botao de login — confirmar com check consecutivo
-                    consecutive_ok += 1
-                    if consecutive_ok >= 2:
+
+                    # Positive confirmation: account element only present when authenticated
+                    account_btn = await page.query_selector(
+                        '[aria-label*="Conta do Google"],[aria-label*="Google Account"],'
+                        'a[aria-label*="Google"],[data-authuser]'
+                    )
+                    if account_btn:
+                        consecutive_ok += 1
+                    else:
+                        # No sign-in button AND no account element — page still loading
+                        consecutive_ok = 0
+
+                    if consecutive_ok >= 4:
                         logged_in = True
                         break
-                    await asyncio.sleep(2)
+                    await asyncio.sleep(3)
                 except Exception as e:
                     if "Login expirado" in str(e):
                         # Invalidar cookies para forcar headed na proxima vez
@@ -443,29 +498,37 @@ async def run_colab_automation(notebook_path: Path, dataset_path: Path, model_ou
                 except Exception:
                     pass
 
-            # ── 6. Injetar dataset automaticamente ────────────────
+            # ── 6. Dataset embutido no notebook — sem interacao necessaria ──
             _update_step(STEPS[5])
-            _log("Aguardando celula de upload do dataset...")
-            # Cells 0-3 (title, config, install, imports) executam antes da Cell 4 (upload).
-            # pip install pode levar 30-60s. Aguardar ate 5 min para o widget aparecer.
-            dataset_injected = await _inject_dataset(page, dataset_path, timeout_s=300)
-            if dataset_injected:
-                _log("Dataset injetado com sucesso — treinamento continuara automaticamente")
-            else:
-                _log("Upload manual necessario — faca upload no Chrome")
+            training_state["dataset_injected"] = True
+            _log("Dataset embutido no notebook (base64) — sem upload necessario")
 
             # ── 7. Aguardar download (ate 90 min) ─────────────────
             _update_step("Treinando no Colab — aguardando conclusao...")
             _log("Treinamento iniciado. Aguardando download do modelo GGUF.")
 
             start = asyncio.get_event_loop().time()
+            last_metric_check = 0.0
             while not download_event.is_set():
                 elapsed = int(asyncio.get_event_loop().time() - start)
-                training_state["metrics"]["step"] = elapsed
                 if elapsed % 300 == 0 and elapsed > 0:
                     _log(f"Treinando... {elapsed // 60} min decorridos")
                 if elapsed > 5400:  # 90 min
                     raise Exception("Timeout de 90 minutos aguardando download do modelo")
+
+                # Extrair metricas do output do Colab a cada 30s
+                now = asyncio.get_event_loop().time()
+                if now - last_metric_check >= 30:
+                    last_metric_check = now
+                    try:
+                        output_text: str = await page.evaluate("""
+                            () => [...document.querySelectorAll('.output-area, .outputarea')]
+                                .map(el => el.innerText)
+                                .join('\\n')
+                        """)
+                        await _parse_training_metrics(output_text)
+                    except Exception:
+                        pass
 
                 # Fallback: polling direto do diretorio de download
                 # para o caso de page.on("download") nao disparar via CDP
