@@ -2,6 +2,7 @@ import platform
 import psutil
 import subprocess
 import shutil
+from fastapi import HTTPException
 
 
 def _get_gpu_info() -> dict | None:
@@ -46,35 +47,38 @@ def _classify_capacity(ram_gb: float, vram_gb: float | None) -> dict:
 
 
 def scan() -> dict:
-    cpu = platform.processor() or platform.machine()
-    cpu_cores = psutil.cpu_count(logical=True)
-    cpu_freq = psutil.cpu_freq()
-    cpu_freq_ghz = round(cpu_freq.max / 1000, 2) if cpu_freq else 0
+    try:
+        cpu = platform.processor() or platform.machine()
+        cpu_cores = psutil.cpu_count(logical=True)
+        cpu_freq = psutil.cpu_freq()
+        cpu_freq_ghz = round(cpu_freq.max / 1000, 2) if cpu_freq else 0
 
-    ram = psutil.virtual_memory()
-    ram_total_gb = round(ram.total / (1024 ** 3), 1)
-    ram_available_gb = round(ram.available / (1024 ** 3), 1)
+        ram = psutil.virtual_memory()
+        ram_total_gb = round(ram.total / (1024 ** 3), 1)
+        ram_available_gb = round(ram.available / (1024 ** 3), 1)
 
-    disk = psutil.disk_usage("/")
-    disk_free_gb = round(disk.free / (1024 ** 3), 1)
+        disk = psutil.disk_usage("/")
+        disk_free_gb = round(disk.free / (1024 ** 3), 1)
 
-    gpu = _get_gpu_info()
-    capacity = _classify_capacity(ram_total_gb, gpu["vram_gb"] if gpu else None)
+        gpu = _get_gpu_info()
+        capacity = _classify_capacity(ram_total_gb, gpu["vram_gb"] if gpu else None)
 
-    return {
-        "cpu": {
-            "model": cpu,
-            "cores": cpu_cores,
-            "freq_ghz": cpu_freq_ghz,
-        },
-        "ram": {
-            "total_gb": ram_total_gb,
-            "available_gb": ram_available_gb,
-        },
-        "gpu": gpu,
-        "disk": {
-            "free_gb": disk_free_gb,
-        },
-        "os": f"{platform.system()} {platform.release()}",
-        "capacity": capacity,
-    }
+        return {
+            "cpu": {
+                "model": cpu,
+                "cores": cpu_cores,
+                "freq_ghz": cpu_freq_ghz,
+            },
+            "ram": {
+                "total_gb": ram_total_gb,
+                "available_gb": ram_available_gb,
+            },
+            "gpu": gpu,
+            "disk": {
+                "free_gb": disk_free_gb,
+            },
+            "os": f"{platform.system()} {platform.release()}",
+            "capacity": capacity,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao escanear hardware: {e}")

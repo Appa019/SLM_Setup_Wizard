@@ -53,7 +53,13 @@ export default function HardwareScan() {
           }
         })
       })
-      .catch(() => setError('Nao foi possivel escanear o hardware.'))
+      .catch((err) => {
+        if (!err.response) {
+          setError('Backend não está rodando. Inicie o servidor e tente novamente.')
+        } else {
+          setError(`Erro ao escanear hardware: ${err.response?.data?.detail || 'tente novamente'}`)
+        }
+      })
       .finally(() => setLoading(false))
   }
 
