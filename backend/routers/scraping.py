@@ -11,8 +11,21 @@ _scraping_config: dict = {}
 
 
 class ScrapingConfig(BaseModel):
-    url_count: int = 1000
+    query_count: int = 50
     topic_profile: dict = {}
+    custom_queries: list[str] = []
+
+
+class GenerateQueriesRequest(BaseModel):
+    topic_profile: dict = {}
+    count: int = 50
+
+
+@router.post("/generate-queries")
+async def generate_queries_endpoint(body: GenerateQueriesRequest):
+    from services.query_generator import generate_queries
+    queries = await generate_queries(body.topic_profile, body.count)
+    return {"queries": queries}
 
 
 @router.post("/config")
@@ -32,7 +45,8 @@ async def start_scraping(background_tasks: BackgroundTasks):
     background_tasks.add_task(
         run_scraping,
         _scraping_config.get("topic_profile", {}),
-        _scraping_config.get("url_count", 1000),
+        _scraping_config.get("query_count", 50),
+        _scraping_config.get("custom_queries", []),
     )
     return {"ok": True, "message": "Scraping iniciado"}
 

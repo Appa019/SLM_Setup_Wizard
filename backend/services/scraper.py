@@ -207,20 +207,24 @@ async def _playwright_fetch(url: str) -> str | None:
         return None
 
 
-async def run_scraping(topic_profile: dict, url_count: int):
+async def run_scraping(topic_profile: dict, query_count: int = 50, custom_queries: list[str] | None = None):
     global scraping_state
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    raw_keywords: list[str] = [k for k in topic_profile.get("keywords", []) + [topic_profile.get("area", "")] if k]
+    if custom_queries:
+        keywords = custom_queries
+    else:
+        keywords = await generate_queries(topic_profile, query_count)
+        if not keywords:
+            keywords = raw_keywords
+
+    url_count = len(keywords) * 20  # ~20 URLs per query
     scraping_state.update({
         "running": True, "total": url_count, "done": 0, "failed": 0,
         "current_url": "", "bytes_collected": 0,
         "start_time": time.time(), "finished": False, "error": "",
     })
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-
-    raw_keywords: list[str] = topic_profile.get("keywords", []) + [topic_profile.get("area", "")]
-    raw_keywords = [k for k in raw_keywords if k]
-    keywords = await generate_queries(topic_profile)
-    if not keywords:
-        keywords = raw_keywords
     results:  list[dict] = []
     limiter   = DomainRateLimiter(max_per_minute=3)
     cookies   = httpx.Cookies()
