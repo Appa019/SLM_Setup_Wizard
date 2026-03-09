@@ -80,6 +80,16 @@ def get_state() -> dict:
     return dict(scraping_state)
 
 
+def reset_scraping_state():
+    global scraping_state
+    scraping_state.update({
+        "running": False, "total": 0, "done": 0, "failed": 0,
+        "current_url": "", "bytes_collected": 0,
+        "start_time": 0.0, "finished": False, "error": "",
+        "phase": "idle", "links_found": 0, "queries_done": 0, "queries_total": 0,
+    })
+
+
 def _random_headers(referer: str = "") -> dict:
     ua = random.choice(USER_AGENTS)
     headers = {
@@ -271,9 +281,12 @@ async def run_scraping(topic_profile: dict, query_count: int = 50, custom_querie
                 referer = SEARCH_ENGINES[0](keywords[0]) if keywords else ""
                 html = await _fetch_with_retry(client, url, referer=referer)
 
-                # Playwright fallback para sites JS-heavy
+                # Playwright fallback para sites JS-heavy (timeout global de 30s)
                 if html is None and not _is_safe_source(url):
-                    html = await _playwright_fetch(url)
+                    try:
+                        html = await asyncio.wait_for(_playwright_fetch(url), timeout=30)
+                    except asyncio.TimeoutError:
+                        html = None
 
                 if html:
                     text = _clean_text(html)
