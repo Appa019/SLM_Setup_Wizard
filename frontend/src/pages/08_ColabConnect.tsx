@@ -15,44 +15,87 @@ const STEPS = [
   { icon: FileUp,        label: 'Injetando dataset de treinamento...' },
 ]
 
+const STEP_LABELS = [
+  'Abrindo Google Colab...',
+  'Verificando login...',
+  'Fazendo upload do notebook...',
+  'Configurando runtime GPU',
+  'Iniciando execucao das celulas...',
+  'Injetando dataset de treinamento...',
+]
+
 interface HyperParams {
-  training_target:           string
-  training_target_reason:    string
-  quantization:              string
-  lora_r:                    number
-  lora_alpha:                number
-  batch_size:                number
+  training_target:             string
+  training_target_reason:      string
+  quantization:                string
+  lora_r:                      number
+  lora_alpha:                  number
+  batch_size:                  number
   gradient_accumulation_steps: number
-  max_seq_length:            number
-  num_epochs:                number
-  learning_rate:             number
-  use_flash_attention:       boolean
-  gradient_checkpointing:    boolean
-  gguf_quantization_type:    string
-  justification:             string
-  training_feasible:         boolean
-  target_modules:            string[]
+  max_seq_length:              number
+  num_epochs:                  number
+  learning_rate:               number
+  use_flash_attention:         boolean
+  gradient_checkpointing:      boolean
+  gguf_quantization_type:      string
+  justification:               string
+  training_feasible:           boolean
+  target_modules:              string[]
+}
+
+// Scanning-line loader (design system)
+function ScanLoader({ label }: { label: string }) {
+  return (
+    <div className="card flex flex-col items-center gap-4 py-8">
+      <div className="relative w-48 h-10 border border-surface-300 bg-surface-50 overflow-hidden">
+        <motion.div
+          className="absolute top-0 left-0 w-full h-0.5 bg-accent-500 opacity-80"
+          animate={{ y: [0, 40, 0] }}
+          transition={{ repeat: Infinity, duration: 1.6, ease: 'linear' }}
+        />
+        <motion.div
+          className="absolute top-0 left-0 w-full h-6 bg-accent-500 opacity-[0.04]"
+          animate={{ y: [0, 40, 0] }}
+          transition={{ repeat: Infinity, duration: 1.6, ease: 'linear' }}
+        />
+      </div>
+      <p className="font-display text-[10px] font-bold uppercase tracking-[0.08em] text-gray-500">{label}</p>
+    </div>
+  )
 }
 
 export default function ColabConnect() {
-  const { state, setCurrentStep } = useWizard()
+  const { state, update, setCurrentStep } = useWizard()
   const navigate = useNavigate()
 
-  const [started, setStarted]   = useState(false)
+  // Restaurar estado persistido do contexto
+  const [started, setStarted]   = useState(state.colabStarted)
   const [starting, setStarting] = useState(false)
-  const [activeIdx, setActiveIdx] = useState(-1)
-  const [params, setParams]     = useState<HyperParams | null>(null)
-  const [target, setTarget]     = useState<'local' | 'colab' | null>(null)
-  const [scriptPath, setScriptPath] = useState('')
-  const [notebookPath, setNbPath]   = useState('')
+  const [params, setParams]     = useState<HyperParams | null>(
+    state.colabParams as HyperParams | null
+  )
+  const [target, setTarget]     = useState<'local' | 'colab' | null>(
+    (state.colabTarget as 'local' | 'colab') || null
+  )
+  const [scriptPath, setScriptPath] = useState(state.colabScriptPath)
+  const [notebookPath, setNbPath]   = useState(state.colabNotebookPath)
+  const [datasetInjected, setDatasetInjected] = useState(false)
+  const [tsStep, setTsStep] = useState('')
 
   useEffect(() => { setCurrentStep(8) }, [setCurrentStep])
 
+  // SSE — reconecta automaticamente ao recarregar se automação ainda rodando
   useEffect(() => {
     if (!started || target !== 'colab') return
-    let i = 0
-    const t = setInterval(() => { setActiveIdx(i); i++; if (i >= STEPS.length) clearInterval(t) }, 2500)
-    return () => clearInterval(t)
+    const es = new EventSource('http://localhost:8000/api/colab/status')
+    es.onmessage = e => {
+      const d = JSON.parse(e.data)
+      setTsStep(d.step ?? '')
+      if (d.dataset_injected) setDatasetInjected(true)
+      if (d.finished || d.error) es.close()
+    }
+    es.onerror = () => es.close()
+    return () => es.close()
   }, [started, target])
 
   async function start() {
@@ -71,16 +114,32 @@ export default function ColabConnect() {
         topic_profile: state.topicProfile   ?? {},
         hardware:      state.hardware       ?? {},
       })
-      setParams(res.data.params)
-      setTarget(res.data.target)
-      if (res.data.notebook_path) setNbPath(res.data.notebook_path)
-      if (res.data.script_path)   setScriptPath(res.data.script_path)
+
+      const { params: p, target: t, notebook_path, script_path } = res.data
+
+      setParams(p)
+      setTarget(t)
+      if (notebook_path) setNbPath(notebook_path)
+      if (script_path)   setScriptPath(script_path)
       setStarted(true)
+
+      // Persistir no contexto para sobreviver à navegação
+      update({
+        colabParams:       p as unknown as Record<string, unknown>,
+        colabTarget:       t,
+        colabStarted:      true,
+        colabNotebookPath: notebook_path ?? '',
+        colabScriptPath:   script_path   ?? '',
+      })
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } } }
       alert(e.response?.data?.detail ?? 'Erro ao iniciar treinamento')
     } finally { setStarting(false) }
   }
+
+  const rawIdx = STEP_LABELS.findIndex(s => tsStep.startsWith(s.slice(0, 15)))
+  // Se step ultrapassou os rastreados (ex: "Treinando no Colab..."), marcar todos como feitos
+  const activeIdx = rawIdx === -1 && tsStep ? STEP_LABELS.length : rawIdx
 
   const ParamRow = ({ label, value }: { label: string; value: string | number | boolean }) => (
     <div className="flex justify-between text-xs border-b border-surface-100 py-1">
@@ -93,7 +152,9 @@ export default function ColabConnect() {
     <Layout title="Treinamento" subtitle="Hiperparametros gerados por GPT-5.1 — Dr. Alex Chen">
       <div className="max-w-xl space-y-4">
 
-        {!started ? (
+        {starting ? (
+          <ScanLoader label="Consultando GPT-5.1 — Dr. Alex Chen..." />
+        ) : !started ? (
           <>
             <div className="card space-y-4">
               <h3 className="font-display text-[11px] font-bold text-gray-900 uppercase tracking-[0.08em] border-b border-surface-200 pb-2">
@@ -129,9 +190,8 @@ export default function ColabConnect() {
               <button onClick={() => navigate('/preprocessing')} className="btn-secondary">
                 <ArrowLeft size={14} /> Voltar
               </button>
-              <button onClick={start} disabled={starting} className="btn-primary">
-                {starting ? 'Consultando GPT-5.1...' : 'Gerar Hiperparametros e Iniciar'}
-                <ArrowRight size={14} />
+              <button onClick={start} className="btn-primary">
+                Gerar Hiperparametros e Iniciar <ArrowRight size={14} />
               </button>
             </div>
           </>
@@ -241,7 +301,7 @@ export default function ColabConnect() {
                 {[
                   'Login automatico via cookies salvos (ou manual na primeira vez)',
                   'Upload do notebook, GPU T4 e Run All sao automaticos',
-                  'Dataset injetado automaticamente na celula de upload',
+                  'Dataset embutido no notebook — sem upload manual necessario',
                   'Download do modelo GGUF detectado ao finalizar',
                   <>Apos a primeira vez, tudo roda em <span className="code">headless</span> (sem tela)</>,
                 ].map((s, i) => (
@@ -258,9 +318,30 @@ export default function ColabConnect() {
               </div>
             )}
 
-            <div className="flex justify-end">
-              <button onClick={() => navigate('/training')} className="btn-primary">
-                Monitorar Treinamento <ArrowRight size={14} />
+            <div className="flex justify-between items-center">
+              <button
+                onClick={() => {
+                  // Permite reiniciar se necessário
+                  update({ colabStarted: false, colabParams: null, colabTarget: '' })
+                  setStarted(false)
+                  setParams(null)
+                  setTarget(null)
+                }}
+                className="btn-secondary text-[10px]"
+              >
+                Regenerar hiperparametros
+              </button>
+              <button
+                onClick={() => navigate('/training')}
+                className="btn-primary"
+                disabled={target === 'colab' && !datasetInjected}
+                title={target === 'colab' && !datasetInjected ? 'Aguardando injecao do dataset...' : ''}
+              >
+                {target === 'colab' && !datasetInjected
+                  ? 'Aguardando dataset...'
+                  : 'Monitorar Treinamento'
+                }
+                {(target !== 'colab' || datasetInjected) && <ArrowRight size={14} />}
               </button>
             </div>
           </>

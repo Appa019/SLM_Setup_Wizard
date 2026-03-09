@@ -18,9 +18,14 @@ export interface WizardState {
   selectedQuant: string
   selectedHfId: string
   topicProfile: Record<string, unknown> | null
-  scrapingConfig: { url_count: number; sources: string[] } | null
+  scrapingConfig: { query_count: number; sources: string[] } | null
   trainingStatus: string
   modelPath: string
+  colabParams: Record<string, unknown> | null
+  colabTarget: 'local' | 'colab' | ''
+  colabStarted: boolean
+  colabScriptPath: string
+  colabNotebookPath: string
 }
 
 interface WizardContextValue {
@@ -42,6 +47,11 @@ const defaultState: WizardState = {
   scrapingConfig: null,
   trainingStatus: '',
   modelPath: '',
+  colabParams: null,
+  colabTarget: '',
+  colabStarted: false,
+  colabScriptPath: '',
+  colabNotebookPath: '',
 }
 
 const STORAGE_KEY = 'wizard-state'
