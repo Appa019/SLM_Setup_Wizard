@@ -47,10 +47,10 @@ timeout 6 uvicorn main:app --host 127.0.0.1 --port 8000
 | `preprocessor.py` | Gera pares instrucao/resposta (JSONL) usando GPT-4o-mini; SSE via `/api/preprocessing/status` |
 | `hyperparams.py` | GPT-5.1 Responses API com prompt "Dr. Alex Chen"; retorna hiperparametros otimos de LoRA |
 | `colab_manager.py` | Gera `colab/generated_notebook.ipynb` (12 cells) ou `colab/local_training.py`. Usa `SFTConfig` + `processing_class` (TRL v0.29+). GGUF conversion em dois passos: f16 + `llama-quantize`. |
-| `colab_playwright.py` | Automacao 100% autonoma do Colab: Chrome headless (apos 1o login), upload notebook, T4 GPU, run all, auto-inject dataset, download .gguf |
+| `colab_playwright.py` | Automacao 100% autonoma do Colab: Chrome headless (apos 1o login), upload notebook, T4 GPU, run all, dataset embutido via base64, download .gguf. Extrai metricas (epoch/loss/step) do DOM do Colab a cada 30s via page.evaluate(). |
 | `model_recommender.py` | Lista modelos com variantes de quantizacao (full/Q8/Q4_K_M) e VRAM necessaria |
 | `cost_tracker.py` | Registra cada chamada OpenAI em `data/costs.jsonl`; calcula custo em USD |
-| `query_generator.py` | Gera queries de busca otimizadas a partir do perfil de tema (GPT-4o-mini) |
+| `query_generator.py` | Gera queries de busca em batches de 50 com deduplicacao (GPT-4o-mini). Suporta counts maiores que 50 via multiplas chamadas. |
 | `llama_cpp_runner.py` | Executa modelo GGUF localmente via llama.cpp |
 
 ### SSE (Server-Sent Events)
@@ -71,7 +71,7 @@ GPT-5.1 otimiza `lora_r`, `batch_size`, etc., mas o router SEMPRE sobrescreve `t
 Chrome real lancado via `subprocess.Popen()` SEM flags de automacao (`--enable-automation` bloquearia login Google). Playwright conecta via `p.chromium.connect_over_cdp("http://localhost:9222")`.
 - **Headless automatico**: primeira execucao abre Chrome com tela (login manual). Execucoes seguintes usam `--headless=new` (cookies reutilizados de `.colab-profile/`). Se cookies expirarem, marker `.login-expired` forca headed na proxima vez.
 - **Perfil persistente**: `.colab-profile/` salva cookies/login entre sessoes (adicionado ao `.gitignore`)
-- **Auto-inject dataset**: `_inject_dataset()` detecta o widget `files.upload()` do Colab (input[type="file"] dentro de output-area) e injeta `training_data.jsonl` via `set_input_files()`. Polling ate 5 min para o widget aparecer.
+- **Dataset embutido**: `_build_dataset_cell()` em `colab_manager.py` codifica `training_data.jsonl` em base64 e embute diretamente na Cell 4 do notebook. A celula decodifica e grava `/content/training_data.jsonl` ao executar — sem interacao do usuario, sem widget `files.upload()`. `dataset_injected` e setado imediatamente apos iniciar execucao das celulas.
 - **UI PT-BR**: seletores usam texto em portugues — `Arquivo`, `Fazer upload de notebook`, `Ambiente de execucao`, `Alterar tipo de ambiente de execucao`
 - **Shadow DOM**: botoes Material Design 3 (ex: salvar GPU) precisam de `get_by_role("button").all()`, nao `button:has-text()`
 - **Radio buttons**: DEVE usar `page.click()` (mouse real), nao `page.evaluate(el.click())` — radio nao dispara change event com click programatico
@@ -79,7 +79,9 @@ Chrome real lancado via `subprocess.Popen()` SEM flags de automacao (`--enable-a
 - **Login detection**: minimo 2 checks consecutivos sem botao "Fazer login" para confirmar (evita false positive durante carregamento)
 - **Race condition SSE**: `reset_training_state()` chamado no router ANTES da `BackgroundTasks` — evita SSE receber estado stale do run anterior
 - **Chrome cleanup**: `proc.wait(timeout=10)` com fallback `proc.kill()` no finally (evita zombie)
-- **Testes manuais**: `colab/tests/t1_connect.py` a `t5_download.py` — scripts standalone, rodar individualmente
+- **Metricas em tempo real**: `_parse_training_metrics()` faz `page.evaluate()` a cada 30s extraindo epoch/loss/step do output do Colab via regex (formato dict HF Trainer e formato tqdm)
+- **Scraper Playwright fallback**: envolvido com `asyncio.wait_for(timeout=30)` — evita que URL lenta bloqueie `asyncio.gather` indefinidamente
+- **Testes manuais**: `colab/tests/t1_connect.py` a `t6_visual_debug.py` — scripts standalone, rodar individualmente. `t6` abre Chrome headed com pausas de 5-8s por step para inspecao visual.
 
 ### Frontend
 - `frontend/src/lib/api.ts` — instancia axios com `baseURL=http://localhost:8000` e timeout 180s (GPT-5.1 reasoning demora)
@@ -135,6 +137,7 @@ Fases validas: `"recommendation"`, `"model_recommendation"`, `"chat"`, `"preproc
 - **LoRA**: NAO usar `get_peft_model()` — passar `peft_config=lora_config` ao `SFTTrainer` (ele faz o wrapping). `print_trainable_parameters()` via `trainer.model`
 - **GGUF**: converter para f16 primeiro (`convert_hf_to_gguf.py --outtype f16`), depois quantizar com `llama-quantize` se tipo nao for direto (`f16`, `f32`, `bf16`, `q8_0`)
 - **Local script**: DEVE incluir merge (`PeftModel.from_pretrained` + `merge_and_unload`) antes da conversao GGUF — `convert_hf_to_gguf.py` precisa de modelo completo, nao adapter
+- **Dataset na Cell 4**: `_build_dataset_cell(dataset_path)` — embute base64, NAO usa `files.upload()`. `generate_notebook()` recebe `dataset_path: Path | None`; fallback para upload manual se arquivo nao existir.
 - **nbformat**: cells precisam de campo `id` (uuid), `source` como lista de strings (`_split_source()`)
 - **Deps**: `trl>=0.29.0`, `transformers>=4.47.0`, `peft>=0.14.0`
 
@@ -143,6 +146,8 @@ Fases validas: `"recommendation"`, `"model_recommendation"`, `"chat"`, `"preproc
 - `useCallback(fn, [])` para funcoes estabilizadas no contexto (ex: `update`, `resetWizard` em WizardContext)
 - SSE nos componentes: fechar EventSource quando `d.finished || d.error`; deps do `useEffect` que abre SSE devem ser `[]`
 - Preprocessing `max_tokens=1100`
+- **WizardContext persistencia**: campos `colabParams/Target/Started/ScriptPath/NotebookPath` salvos em sessionStorage — sobrevivem navegacao entre steps. Ao adicionar estado que deve persistir entre paginas, adicionar ao `WizardState` e chamar `update()` apos sucesso.
+- **activeIdx em progresso SSE**: se `tsStep` ultrapassar os steps rastreados (ex: "Treinando no Colab..."), usar `STEP_LABELS.length` como `activeIdx` para marcar todos como concluidos (verdes).
 
 ## Regras
 - Nenhum commit deve ser co-autorado por Claude ou citar Claude
