@@ -1,3 +1,4 @@
+import base64
 import json
 import re
 import uuid
@@ -42,10 +43,46 @@ def write_sidecar(slug: str, topic_profile: dict, model_id: str,
     )
 
 
+def _build_dataset_cell(dataset_path: Path | None) -> dict:
+    """Gera célula que escreve o dataset diretamente em /content/training_data.jsonl.
+
+    Se dataset_path existir, embute os dados em base64 — sem interação do usuário.
+    Caso contrário, gera célula de fallback que pede upload manual.
+    """
+    target = "/content/training_data.jsonl"
+
+    if dataset_path and dataset_path.exists():
+        raw_bytes = dataset_path.read_bytes()
+        b64 = base64.b64encode(raw_bytes).decode("ascii")
+        # Quebrar em linhas de 76 chars para legibilidade no notebook
+        chunks = [b64[i:i+76] for i in range(0, len(b64), 76)]
+        lines_repr = '(\n    "' + '"\n    "'.join(chunks) + '"\n)'
+        source = (
+            "import base64\n"
+            f"_DATA_B64 = {lines_repr}\n"
+            f"with open('{target}', 'wb') as _f:\n"
+            "    _f.write(base64.b64decode(_DATA_B64))\n"
+            f'dataset_path = "{target}"\n'
+            f'print(f"Dataset pronto: {{dataset_path}} ({{len(open(dataset_path).readlines())}} linhas)")'
+        )
+    else:
+        # Fallback: upload manual (comportamento antigo)
+        source = (
+            "from google.colab import files\n"
+            'print("Dataset nao embutido — faca upload do training_data.jsonl")\n'
+            "uploaded = files.upload()\n"
+            "dataset_path = list(uploaded.keys())[0]\n"
+            'print(f"Dataset carregado: {dataset_path}")'
+        )
+
+    return _code_cell(source)
+
+
 def generate_notebook(model_id: str, topic_profile: dict,
                       params: dict | None = None,
                       model_slug: str = "especialista",
-                      hf_id: str = "") -> Path:
+                      hf_id: str = "",
+                      dataset_path: Path | None = None) -> Path:
     """Gera notebook Colab com celula de configuracao dinamica da IA."""
     COLAB_DIR.mkdir(parents=True, exist_ok=True)
     hf_model   = hf_id if hf_id else MODEL_MAP.get(model_id, "meta-llama/Llama-3.2-3B-Instruct")
@@ -108,14 +145,8 @@ def generate_notebook(model_id: str, topic_profile: dict,
             'print(f"GPU: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \'CPU\'}")'
         ),
 
-        # Cell 4: Upload dataset
-        _code_cell(
-            "from google.colab import files\n"
-            'print("Faca upload do arquivo training_data.jsonl")\n'
-            "uploaded = files.upload()\n"
-            "dataset_path = list(uploaded.keys())[0]\n"
-            'print(f"Dataset carregado: {dataset_path}")'
-        ),
+        # Cell 4: Dataset embutido em base64 (sem interação do usuário)
+        _build_dataset_cell(dataset_path),
 
         # Cell 5: Load dataset
         _code_cell(

@@ -108,7 +108,7 @@ async def start_colab(body: ColabStartRequest, background_tasks: BackgroundTasks
         }
 
     # Caso contrario → notebook Colab + automacao Playwright
-    notebook_path = generate_notebook(body.model_id, body.topic_profile, params, model_slug, hf_id=body.hf_id)
+    notebook_path = generate_notebook(body.model_id, body.topic_profile, params, model_slug, hf_id=body.hf_id, dataset_path=dataset_path)
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     # Resetar estado ANTES de agendar a task — evita race condition
     # onde o SSE recebe finished=True do run anterior
