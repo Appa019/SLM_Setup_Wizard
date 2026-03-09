@@ -1,5 +1,5 @@
 # Modelo SLM Local
-
+**Landing Page: https://slm-local-landing.vercel.app/**
 Wizard completo de 10 etapas para criar **modelos de linguagem especializados** — do zero ao chat funcionando.
 
 Voce define o tema, o sistema coleta dados da web, gera pares de treinamento com GPT-4o-mini, calcula hiperparametros otimos com GPT-5.1, treina via LoRA/QLoRA no Google Colab (T4 free) ou na sua GPU local, e entrega um modelo GGUF rodando localmente via llama.cpp.
