@@ -3,7 +3,7 @@ import json
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from services.scraper import run_scraping, get_state
+from services.scraper import run_scraping, get_state, reset_scraping_state
 
 router = APIRouter()
 
@@ -42,6 +42,7 @@ async def start_scraping(background_tasks: BackgroundTasks):
         raise HTTPException(status_code=409, detail="Scraping ja em execucao")
     if not _scraping_config:
         raise HTTPException(status_code=400, detail="Configure o scraping primeiro")
+    reset_scraping_state()
     background_tasks.add_task(
         run_scraping,
         _scraping_config.get("topic_profile", {}),

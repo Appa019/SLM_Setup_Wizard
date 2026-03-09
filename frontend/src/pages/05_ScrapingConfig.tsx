@@ -63,7 +63,7 @@ export default function ScrapingConfig() {
   async function start() {
     if (saving || queries.length === 0) return
     setSaving(true)
-    update({ scrapingConfig: { url_count: queryCount * 20, sources } })
+    update({ scrapingConfig: { query_count: queryCount, sources } })
     try {
       await api.post('/api/scraping/config', {
         query_count: queryCount,
